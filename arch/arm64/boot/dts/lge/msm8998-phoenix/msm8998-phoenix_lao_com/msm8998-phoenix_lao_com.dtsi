@@ -198,35 +198,3 @@
 &wil6210 {
 	status = "disabled";
 };
-
-&firmware {
-	android {
-		/delete-node/ vbmeta;
-		fstab {
-			product {
-				status = "disable";
-			};
-			vendor {
-				fsmgr_flags = "wait,slotselect,verify";
-			};
-			OP {
-				compatible = "android,OP";
-				dev = "/dev/block/platform/soc/1da4000.ufshc/by-name/OP";
-				type = "ext4";
-				mnt_point = "/oem/OP";
-				mnt_flags = "ro,noatime,nosuid,nodev,barrier=1,data=ordered,noauto_da_alloc";
-				fsmgr_flags = "wait,slotselect,verify,nofail";
-				status = "ok";
-			};
-			drm {
-				compatible = "android,drm";
-				dev = "/dev/block/platform/soc/1da4000.ufshc/by-name/drm";
-				type = "ext4";
-				mnt_point = "/mnt/vendor/persist-lg";
-				mnt_flags = "noatime,nosuid,nodev,barrier=1,data=ordered,noauto_da_alloc,errors=continue";
-				fsmgr_flags = "wait,formattable";
-				status = "ok";
-			};
-		};
-	};
-};
