@@ -844,4 +844,15 @@ config INPUT_STMVL53L0
 	 To compile this driver as a module, choose M here: the
 	 module will be called stmvl53l0.
 
+config SAR_ATMF04
+    bool "ATMF04 support"
+    depends on I2C
+    help
+     Support ATMF04 as and input device.
+
+config LGE_USE_SAR_CONTROLLER
+    bool "Sar controller device"
+    help
+     Support Sar Contoller for this model.
+
 endif

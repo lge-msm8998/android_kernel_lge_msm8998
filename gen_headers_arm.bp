@@ -627,6 +627,7 @@ gen_headers_out_arm = [
     "linux/xilinx-v4l2-controls.h",
     "linux/zorro.h",
     "linux/zorro_ids.h",
+    "linux/lib_triton.h",
     "media/msm_ba.h",
     "media/msm_cam_sensor.h",
     "media/msm_camera.h",

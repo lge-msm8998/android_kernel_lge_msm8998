@@ -214,4 +214,12 @@ source "drivers/sensors/Kconfig"
 
 source "drivers/tee/Kconfig"
 
+source "drivers/tspdrv/Kconfig"
+
+source "drivers/broadcast/Kconfig"
+
+source "drivers/gud/Kconfig"
+
+source "drivers/nfc/Kconfig"
+
 endmenu

@@ -1428,6 +1428,9 @@ static void ufshcd_ungate_work(struct work_struct *work)
 	ufshcd_hba_vreg_set_hpm(hba);
 	ufshcd_enable_clocks(hba);
 
+	/* enable the host irq */
+	ufshcd_enable_irq(hba);
+
 	/* Exit from hibern8 */
 	if (ufshcd_can_hibern8_during_gating(hba)) {
 		/* Prevent gating in this path */
@@ -1592,6 +1595,9 @@ static void ufshcd_gate_work(struct work_struct *work)
 		}
 		ufshcd_set_link_hibern8(hba);
 	}
+
+	/* disable the host irq */
+	ufshcd_disable_irq(hba);
 
 	/*
 	 * If auto hibern8 is supported then the link will already
@@ -3817,17 +3823,53 @@ static inline int ufshcd_read_desc(struct ufs_hba *hba,
 	return ufshcd_read_desc_param(hba, desc_id, desc_index, 0, buf, size);
 }
 
+#ifdef CONFIG_UFS_LGE_FEATURE
+int ufshcd_read_power_desc(struct ufs_hba *hba,
+					 u8 *buf,
+					 u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_POWER, 0, buf, size);
+}
+#else
 static inline int ufshcd_read_power_desc(struct ufs_hba *hba,
 					 u8 *buf,
 					 u32 size)
 {
 	return ufshcd_read_desc(hba, QUERY_DESC_IDN_POWER, 0, buf, size);
 }
+#endif
 
 int ufshcd_read_device_desc(struct ufs_hba *hba, u8 *buf, u32 size)
 {
 	return ufshcd_read_desc(hba, QUERY_DESC_IDN_DEVICE, 0, buf, size);
 }
+
+#ifdef CONFIG_UFS_LGE_FEATURE
+int ufshcd_read_geo_desc(struct ufs_hba *hba, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_GEOMETRY, 0, buf, size);
+}
+
+int ufshcd_read_config_desc(struct ufs_hba *hba, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_CONFIGURAION, 0, buf, size);
+}
+
+int ufshcd_read_unit_desc(struct ufs_hba *hba, int u_index, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_UNIT, u_index, buf, size);
+}
+
+int ufshcd_read_inter_desc(struct ufs_hba *hba, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_INTERCONNECT, 0, buf, size);
+}
+
+int ufshcd_read_health_desc(struct ufs_hba *hba, u8 *buf, u32 size)
+{
+	return ufshcd_read_desc(hba, QUERY_DESC_IDN_HEALTH, 0, buf, size);
+}
+#endif
 
 /**
  * ufshcd_read_string_desc - read string descriptor
@@ -4403,6 +4445,27 @@ int ufshcd_wait_for_doorbell_clr(struct ufs_hba *hba, u64 wait_timeout_us)
 		dev_err(hba->dev,
 			"%s: timedout waiting for doorbell to clear (tm=0x%x, tr=0x%x)\n",
 			__func__, tm_doorbell, tr_doorbell);
+#ifdef CONFIG_MACH_LGE
+		if(hweight32(tr_doorbell) >= 16)
+		{
+			hba->ufshcd_state = UFSHCD_STATE_RESET;
+			ufshcd_set_eh_in_progress(hba);
+
+			spin_unlock_irqrestore(hba->host->host_lock, flags);
+			ufshcd_release_all(hba);
+			up_write(&hba->lock);
+			ufshcd_scsi_unblock_requests(hba);
+
+			ufshcd_reset_and_restore(hba);
+
+			ufshcd_scsi_block_requests(hba);
+			down_write(&hba->lock);
+			ufshcd_hold_all(hba);
+			spin_lock_irqsave(hba->host->host_lock, flags);
+
+			ufshcd_clear_eh_in_progress(hba);
+		}
+#endif
 		ret = -EBUSY;
 	}
 out:
@@ -6393,6 +6456,12 @@ static irqreturn_t ufshcd_update_uic_error(struct ufs_hba *hba)
 						__func__, reg);
 					hba->full_init_linereset = true;
 				}
+				else {
+					dev_err(hba->dev, "%s: LINERESET during hibern8 enter with cmd!=UIC_CMD_DME_HIBER_ENTER, reg 0x%x\n",__func__, reg);
+				}
+			}
+			else {
+				dev_err(hba->dev, "%s: LINERESET during hibern8 enter with no_cmd, reg 0x%x\n", __func__, reg);
 			}
 			if (!hba->full_init_linereset)
 				schedule_work(&hba->rls_work);
@@ -7711,6 +7780,7 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_DESC_IDN_INTERCONNECT:
 		case QUERY_DESC_IDN_GEOMETRY:
 		case QUERY_DESC_IDN_POWER:
+		case QUERY_DESC_IDN_HEALTH:
 			index = 0;
 			break;
 		case QUERY_DESC_IDN_UNIT:
@@ -7806,6 +7876,9 @@ static int ufshcd_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_FLAG_IDN_PURGE_ENABLE:
 		case QUERY_FLAG_IDN_FPHYRESOURCEREMOVAL:
 		case QUERY_FLAG_IDN_BUSY_RTC:
+#ifdef CONFIG_UFS_LGE_FEATURE
+		case QUERY_FLAG_IDN_PERMANENT_DIS_FWUPT:
+#endif
 			break;
 		default:
 			goto out_einval;

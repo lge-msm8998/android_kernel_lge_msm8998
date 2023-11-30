@@ -60,6 +60,17 @@ enum {
 	TSTBUS_MAX,
 };
 
+bool broken_auto_hibern8=false;
+static int __init
+check_ufs_vendor(char *vendor_info)
+{
+  if (!strncmp(vendor_info, "SKHYNIX", 7))
+    broken_auto_hibern8 = true;
+
+  return 1;
+}
+__setup("androidboot.hardware.ufs=",check_ufs_vendor);
+
 static struct ufs_qcom_host *ufs_qcom_hosts[MAX_UFS_QCOM_HOSTS];
 
 static int ufs_qcom_update_sec_cfg(struct ufs_hba *hba, bool restore_sec_cfg);
@@ -1507,7 +1518,9 @@ static void ufs_qcom_advertise_quirks(struct ufs_hba *hba)
 				| UFSHCD_QUIRK_BROKEN_PA_RXHSUNTERMCAP);
 	}
 
-	if (host->disable_lpm)
+    printk("broken_auto_hibern8 = %d\n", broken_auto_hibern8);
+
+    if(broken_auto_hibern8)
 		hba->quirks |= UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8;
 }
 
@@ -2128,6 +2141,8 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 		dev_err(dev, "%s: ufs_qcom_ice_get_dev failed %d\n",
 			__func__, err);
 		goto out_host_free;
+	} else {
+		hba->host->inlinecrypt_support = 1;
 	}
 
 	host->generic_phy = devm_phy_get(dev, "ufsphy");

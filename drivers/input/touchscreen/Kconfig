@@ -11,7 +11,8 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
-source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
+source "drivers/input/touchscreen/lge/Kconfig"
+#source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
 
 config OF_TOUCHSCREEN
 	def_tristate INPUT
@@ -1214,15 +1215,5 @@ config TOUCHSCREEN_IT7260_I2C
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called it7258_ts_i2c.
-
-config TOUCHSCREEN_ST
-	bool "STMicroelectronics Touchscreen Driver"
-	depends on I2C
-	help
-	  Say Y here if you have a STMicroelectronics Touchscreen.
-
-	  If unsure, say N.
-
-source "drivers/input/touchscreen/st/Kconfig"
 
 endif

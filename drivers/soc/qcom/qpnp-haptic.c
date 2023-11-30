@@ -591,6 +591,9 @@ static int qpnp_hap_play(struct qpnp_hap *hap, bool on)
 
 	val = on ? QPNP_HAP_PLAY_EN_BIT : 0;
 	rc = qpnp_hap_write_reg(hap, QPNP_HAP_PLAY_REG(hap->base), val);
+
+	pr_info("[VIB] qpnp_hap_play: on = %d, voltage = %d \n", on, hap->vmax_mv);
+
 	return rc;
 }
 
@@ -1463,6 +1466,72 @@ static ssize_t qpnp_hap_play_mode_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s\n", str);
 }
 
+/* sysfs show for amp */
+static ssize_t qpnp_hap_amp_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+			timed_dev);
+	u8 reg = 0, temp = 0;
+	int res, ret;
+
+	ret = qpnp_hap_read_reg(hap, QPNP_HAP_VMAX_REG(hap->base), &reg);
+	if (ret < 0) {
+		pr_err("Error reading address: %X\n",
+			QPNP_HAP_VMAX_REG(hap->base));
+		return ret;
+	}
+
+	reg &= QPNP_HAP_VMAX_MASK;
+	temp = reg >> QPNP_HAP_VMAX_SHIFT;
+	res = temp * QPNP_HAP_VMAX_MIN_MV;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", res);
+}
+
+/* sysfs store for amp */
+static ssize_t qpnp_hap_amp_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
+	struct qpnp_hap *hap = container_of(timed_dev, struct qpnp_hap,
+			timed_dev);
+	u8 reg = 0;
+	int temp, ret, value;
+
+	if (sscanf(buf, "%d", &value) != 1)
+		return -EINVAL;
+
+	if (value < QPNP_HAP_VMAX_MIN_MV)
+		value = QPNP_HAP_VMAX_MIN_MV;
+	else if (value > QPNP_HAP_VMAX_MAX_MV)
+		value = QPNP_HAP_VMAX_MAX_MV;
+
+	ret = qpnp_hap_read_reg(hap, QPNP_HAP_VMAX_REG(hap->base), &reg);
+
+	if (ret < 0) {
+		pr_err("Error reading address: %X\n",
+			QPNP_HAP_VMAX_REG(hap->base));
+	}
+
+	reg &= ~QPNP_HAP_VMAX_MASK;
+	/* Vmax Controlled by 116mV step. So we divide our input Voltage by 116 */
+	temp = value / QPNP_HAP_VMAX_MIN_MV;
+	/* Changed Vmax have to save to hap->vmax_mv and hap->vmax_mv_orig to
+	   recover vmax that changed here */
+	hap->vmax_mv = temp * QPNP_HAP_VMAX_MIN_MV;
+	reg |= (temp << QPNP_HAP_VMAX_SHIFT);
+
+	ret = qpnp_hap_write_reg(hap, QPNP_HAP_VMAX_REG(hap->base), reg);
+	if (ret < 0) {
+		pr_err("Error writing address: %X\n",
+			QPNP_HAP_VMAX_REG(hap->base));
+	}
+
+	return count;
+}
+
 /* sysfs store for ramp test data */
 static ssize_t qpnp_hap_min_max_test_data_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -1863,6 +1932,7 @@ static struct device_attribute qpnp_hap_attrs[] = {
 	__ATTR(vtg_min, 0664, qpnp_hap_min_show, NULL),
 	__ATTR(vtg_max, 0664, qpnp_hap_max_show, NULL),
 	__ATTR(vtg_default, 0664, qpnp_hap_default_show, NULL),
+	__ATTR(amp, 0664, qpnp_hap_amp_show, qpnp_hap_amp_store),
 };
 
 static int calculate_lra_code(struct qpnp_hap *hap)

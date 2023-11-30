@@ -1884,7 +1884,6 @@ void qpnp_adc_disable_voltage(struct qpnp_adc_drv *adc);
  * @dev:	Structure device for qpnp vadc
  */
 void qpnp_adc_free_voltage_resource(struct qpnp_adc_drv *adc);
-
 #else
 static inline int32_t qpnp_vadc_read(struct qpnp_vadc_chip *dev,
 				uint32_t channel,

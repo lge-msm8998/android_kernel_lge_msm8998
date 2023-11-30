@@ -21,3 +21,16 @@
 	compatible = "qcom,msm8998";
 	qcom,board-id = <0 0>;
 };
+
+&pmi8998_wled {
+	/delete-property/qcom,auto-calibration-enable;
+};
+
+&pmi8998_haptics {
+	/delete-property/qcom,correct-lra-drive-freq;
+};
+
+&mdss_dsi0 {
+	/delete-property/qcom,null-insertion-enabled;
+};
+

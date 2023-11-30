@@ -414,6 +414,9 @@ struct dsi_err_container {
 #define MDSS_DSI_COMMAND_COMPRESSION_MODE_CTRL3	0x02b0
 #define MSM_DBA_CHIP_NAME_MAX_LEN				20
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+#include "lge/lge_mdss_dsi.h"
+#endif
 struct mdss_dsi_ctrl_pdata {
 	int ndx;	/* panel_num */
 	int (*on) (struct mdss_panel_data *pdata);
@@ -576,7 +579,6 @@ struct mdss_dsi_ctrl_pdata {
 	struct mdss_dsi_debugfs_info *debugfs_info;
 
 	struct dsi_err_container err_cont;
-
 	struct kobject *kobj;
 	int fb_node;
 
@@ -591,6 +593,10 @@ struct mdss_dsi_ctrl_pdata {
 	bool update_phy_timing; /* flag to recalculate PHY timings */
 
 	bool phy_power_off;
+
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+	struct lge_mdss_dsi_ctrl_pdata lge_extra;
+#endif
 };
 
 struct dsi_status_data {

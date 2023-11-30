@@ -153,6 +153,7 @@ dtb-$(CONFIG_MSM_GVM_QUIN) += vplatform-lfv-msm8996-telematics.dtb \
 	vplatform-lfv-msm8996-ivi-lv-mt.dtb
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
+ifneq ($(CONFIG_MACH_LGE),y)
 dtbo-$(CONFIG_ARCH_MSM8998) += \
 	msm8998-cdp-overlay.dtbo \
 	msm8998-mtp-overlay.dtbo \
@@ -173,6 +174,11 @@ msm8998-v2.1-mtp-overlay.dtbo-base :=  msm8998-v2.1.dtb
 msm8998-qrd-overlay.dtbo-base :=  msm8998-qrd.dtb
 msm8998-qrd-vr1-overlay.dtbo-base :=  msm8998-qrd-vr1.dtb
 msm8998-qrd-skuk-overlay.dtbo-base :=  msm8998-qrd-skuk.dtb
+else #CONFIG_MACH_LGE
+dtbo-$(CONFIG_ARCH_MSM8998) += \
+	msm8998-v2.dtb \
+	msm8998-v2.1.dtb
+endif
 else
 dtb-$(CONFIG_ARCH_MSM8998) += msm8998-sim.dtb \
 	msm8998-rumi.dtb \
@@ -210,7 +216,7 @@ dtb-$(CONFIG_ARCH_MSM8998) += msm8998-sim.dtb \
 	msm8998-v2.1-interposer-sdm660-qrd.dtb
 endif
 
-dtb-$(CONFIG_ARCH_MSMHAMSTER) += msmhamster-rumi.dtb
+#dtb-$(CONFIG_ARCH_MSMHAMSTER) += msmhamster-rumi.dtb
 
 dtb-$(CONFIG_ARCH_SDM660) += sdm660-sim.dtb \
 	sdm660-internal-codec-cdp.dtb \

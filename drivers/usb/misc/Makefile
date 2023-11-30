@@ -31,3 +31,5 @@ obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
 
 obj-$(CONFIG_USB_QTI_KS_BRIDGE)		+= ks_bridge.o
 obj-$(CONFIG_USB_QCOM_DIAG_BRIDGE)	+= diag_ipc_bridge.o
+obj-$(CONFIG_LGE_USB_SWITCH_FUSB252)	+= fusb252.o
+obj-$(CONFIG_LGE_USB_MOISTURE_DETECTION) += lgmd/

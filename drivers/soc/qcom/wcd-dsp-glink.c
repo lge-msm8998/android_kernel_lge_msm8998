@@ -93,6 +93,12 @@ struct wdsp_glink_ch {
 	wait_queue_head_t ch_free_wait;
 
 	/*
+	 * Used to check if both local disconnect and remote disconnect
+	 * states are notified before freeing channel resources
+	 */
+	int ch_close_state;
+
+	/*
 	 * Glink channel configuration. This has to be the last
 	 * member of the strucuture as it has variable size
 	 */
@@ -164,8 +170,10 @@ static void wdsp_glink_free_tx_buf(const void *priv, const void *pkt_priv)
 	ch = (struct wdsp_glink_ch *)priv;
 	wpriv = ch->wpriv;
 	/* Work queue to free tx pkt */
-	INIT_WORK(&tx_buf->free_tx_work, wdsp_glink_free_tx_buf_work);
-	queue_work(wpriv->work_queue, &tx_buf->free_tx_work);
+	if (wpriv && wpriv->work_queue) {
+		INIT_WORK(&tx_buf->free_tx_work, wdsp_glink_free_tx_buf_work);
+		queue_work(wpriv->work_queue, &tx_buf->free_tx_work);
+	}
 }
 
 /*
@@ -654,6 +662,7 @@ static int wdsp_glink_ch_info_init(struct wdsp_glink_priv *wpriv,
 
 		mutex_init(&ch[i]->mutex);
 		ch[i]->wpriv = wpriv;
+
 		INIT_WORK(&ch[i]->lcl_ch_open_wrk, wdsp_glink_lcl_ch_open_wrk);
 		INIT_WORK(&ch[i]->lcl_ch_cls_wrk, wdsp_glink_lcl_ch_cls_wrk);
 		init_waitqueue_head(&ch[i]->ch_connect_wait);

@@ -1369,6 +1369,8 @@ static void tsens_poll(struct work_struct *work)
 	void __iomem *sensor_int_mask_addr;
 	void __iomem *sensor_critical_addr;
 
+	static bool falsealarm_flag = true;
+	u64 start_t;
 	/* Set the Critical temperature threshold to a value of 10 that should
 	 * guarantee a threshold to trigger. Check the interrupt count if
 	 * it did. Schedule the next round of the above test again after
@@ -1421,15 +1423,26 @@ static void tsens_poll(struct work_struct *work)
 
 	if (tmdev->tsens_critical_poll) {
 		msleep(TSENS_DEBUG_POLL_MS);
+		start_t = sched_clock();
+		while ((sched_clock() - start_t) < (TSENS_DEBUG_POLL_MS * 1000000))
+		{
+			msleep(10);
+		}
 		sensor_status_addr = TSENS_TM_SN_STATUS(tmdev->tsens_addr);
 
 		spin_lock_irqsave(&tmdev->tsens_crit_lock, flags);
 		status = readl_relaxed(sensor_status_addr);
 		spin_unlock_irqrestore(&tmdev->tsens_crit_lock, flags);
 
-		if (status & TSENS_TM_SN_STATUS_CRITICAL_STATUS)
+		if (status & TSENS_TM_SN_STATUS_CRITICAL_STATUS){
+			falsealarm_flag = true;
 			goto re_schedule;
+		}
 		else {
+			if (falsealarm_flag) {
+				falsealarm_flag = false;
+				goto re_schedule;
+			}
 			pr_err("status:0x%x\n", status);
 			goto debug_start;
 		}

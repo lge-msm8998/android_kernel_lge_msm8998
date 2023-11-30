@@ -55,6 +55,7 @@ extern int minsize;		/* Minimum blob size */
 extern int padsize;		/* Additional padding to blob */
 extern int alignsize;		/* Additional padding to blob accroding to the alignsize */
 extern int phandle_format;	/* Use linux,phandle or phandle properties */
+extern int show_deleted_list;	/* show list of deleted node and property */
 extern int generate_symbols;	/* generate symbols for nodes with labels */
 extern int generate_fixups;	/* generate fixups */
 extern int auto_label_aliases;	/* auto generate labels -> aliases */
@@ -62,6 +63,8 @@ extern int auto_label_aliases;	/* auto generate labels -> aliases */
 #define PHANDLE_LEGACY	0x1
 #define PHANDLE_EPAPR	0x2
 #define PHANDLE_BOTH	0x3
+#define PHANDLE_SPECIFIC	0x4
+#define PHANDLE_SPECIFIC2	0x5
 
 typedef uint32_t cell_t;
 
@@ -164,6 +167,17 @@ struct node {
 	struct label *labels;
 };
 
+enum deltype {
+	DEL_TYPE_PROP,
+	DEL_TYPE_NODE,
+};
+
+struct del_list {
+	char *name;
+	enum deltype type;
+	struct del_list *next;
+};
+
 #define for_each_label_withdel(l0, l) \
 	for ((l) = (l0); (l); (l) = (l)->next)
 
@@ -185,8 +199,14 @@ struct node {
 	for_each_child_withdel(n, c) \
 		if (!(c)->deleted)
 
+#define for_each_del_list(dl0, dl) \
+	for ((dl) = (dl0); (dl); (dl) = (dl)->next)
+
 void add_label(struct label **labels, char *label);
 void delete_labels(struct label **labels);
+
+void add_del_list_node(struct del_list **dlist, char *ditem);
+void add_del_list_property(struct del_list **dlist, char *ditem);
 
 struct property *build_property(char *name, struct data val);
 struct property *build_property_delete(char *name);
@@ -245,6 +265,7 @@ struct dt_info {
 	unsigned int dtsflags;
 	struct reserve_info *reservelist;
 	uint32_t boot_cpuid_phys;
+	struct del_list *deleted_list;
 	struct node *dt;		/* the device tree */
 };
 

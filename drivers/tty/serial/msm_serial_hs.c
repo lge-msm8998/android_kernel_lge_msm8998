@@ -3,7 +3,7 @@
  * MSM 7k High speed uart driver
  *
  * Copyright (c) 2008 Google Inc.
- * Copyright (c) 2007-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2007-2020, The Linux Foundation. All rights reserved.
  * Modified: Nick Pelly <npelly@google.com>
  *
  * All source code in this file is licensed under the following license
@@ -725,6 +725,7 @@ static int msm_hs_remove(struct platform_device *pdev)
 	if (!msm_uport)
 		return -EINVAL;
 
+	del_timer_sync(&msm_uport->tx.tx_timeout_timer);
 	dev = msm_uport->uport.dev;
 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_clock.attr);
 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_debug_mask.attr);
@@ -2774,9 +2775,6 @@ static int msm_hs_startup(struct uart_port *uport)
 
 	tx->dma_in_flight = false;
 	MSM_HS_DBG("%s():desc usage flag 0x%lx", __func__, rx->queued_flag);
-	setup_timer(&(tx->tx_timeout_timer),
-			tx_timeout_handler,
-			(unsigned long) msm_uport);
 
 	/* Enable reading the current CTS, no harm even if CTS is ignored */
 	msm_uport->imr_reg |= UARTDM_ISR_CURRENT_CTS_BMSK;
@@ -2877,6 +2875,9 @@ static int uartdm_init_port(struct uart_port *uport)
 	msm_hs_write(uport, UARTDM_BADR_ADDR, 64);
 
 	INIT_DELAYED_WORK(&rx->flip_insert_work, flip_insert_work);
+	setup_timer(&(tx->tx_timeout_timer),
+			tx_timeout_handler,
+			(unsigned long) msm_uport);
 
 	return ret;
 exit_lh_init:
@@ -3535,7 +3536,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: error creating logging context",
 								__func__);
 	} else {
-		msm_uport->ipc_debug_mask = INFO_LEV;
+		msm_uport->ipc_debug_mask = DBG_LEV;
 		ret = sysfs_create_file(&pdev->dev.kobj,
 				&dev_attr_debug_mask.attr);
 		if (unlikely(ret))
@@ -3784,6 +3785,7 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	if (!ret)
 		MSM_HS_WARN("Shutdown called when tx buff not empty");
 
+	del_timer(&msm_uport->tx.tx_timeout_timer);
 	msm_hs_resource_vote(msm_uport);
 	/* Stop remote side from sending data */
 	msm_hs_disable_flow_control(uport, false);

@@ -49,6 +49,17 @@
 
 #define SPI_MAX_BYTES_PER_WORD			(4)
 
+#if defined(CONFIG_LGE_TOUCH_LGSIC_SW49410)
+atomic_t is_touch_spi;
+u32 last_rate;
+
+int touch_spi_voting(int voting)
+{
+	atomic_set(&is_touch_spi, voting);
+	return 0;
+}
+#endif
+
 static int msm_spi_pm_resume_runtime(struct device *device);
 static int msm_spi_pm_suspend_runtime(struct device *device);
 static inline void msm_spi_dma_unmap_buffers(struct msm_spi *dd);
@@ -306,6 +317,9 @@ static void msm_spi_clk_path_vote(struct msm_spi *dd, u32 rate)
 		u64 ib = rate * dd->pdata->bus_width;
 
 		msm_bus_scale_update_bw(dd->bus_cl_hdl, 0, ib);
+#if defined(CONFIG_LGE_TOUCH_LGSIC_SW49410)
+		last_rate = rate;
+#endif
 	}
 }
 
@@ -1541,8 +1555,17 @@ static inline void msm_spi_set_cs(struct spi_device *spi, bool set_flag)
 			return;
 	}
 
+#if defined(CONFIG_LGE_TOUCH_LGSIC_SW49410)
+	if (atomic_read(&is_touch_spi) == 0) {
+		msm_spi_clk_path_vote(dd, spi->max_speed_hz);
+	} else {
+		if(last_rate != spi->max_speed_hz) {
+			msm_spi_clk_path_vote(dd, spi->max_speed_hz);
+		}
+	}
+#else
 	msm_spi_clk_path_vote(dd, spi->max_speed_hz);
-
+#endif
 	if (!(spi->mode & SPI_CS_HIGH))
 		set_flag = !set_flag;
 

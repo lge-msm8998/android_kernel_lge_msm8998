@@ -54,6 +54,9 @@
 #define DFPS_DATA_MAX_FPS 0x7fffffff
 #define DFPS_DATA_MAX_CLK_RATE 250000
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+extern int lge_mdss_post_1st_kickoff(struct msm_fb_data_type *mfd);
+#endif
 static int mdss_mdp_overlay_free_fb_pipe(struct msm_fb_data_type *mfd);
 static int mdss_mdp_overlay_fb_parse_dt(struct msm_fb_data_type *mfd);
 static int mdss_mdp_overlay_off(struct msm_fb_data_type *mfd);
@@ -3242,6 +3245,9 @@ static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 {
 	struct msm_fb_data_type *mfd = NULL;
 	struct mdss_overlay_private *mdp5_data = NULL;
+#ifdef CONFIG_LGE_VSYNC_SKIP
+	struct mdss_data_type *mdata = NULL;
+#endif
 
 	if (!ctl) {
 		pr_err("ctl is NULL\n");
@@ -3260,10 +3266,44 @@ static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 		return;
 	}
 
+#ifdef CONFIG_LGE_VSYNC_SKIP
+	mdata = mfd_to_mdata(mfd);
+	if (!mdata) {
+		pr_err("mdata is NULL\n");
+		return;
+	}
+
+	if (mdata->enable_skip_vsync) {
+		mdata->bucket += mdata->weight;
+		if (mdata->skip_first == false) {
+			mdata->skip_first = true;
+
+			pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
+
+			mdp5_data->vsync_time = t;
+			sysfs_notify_dirent(mdp5_data->vsync_event_sd);
+		} else {
+			if (mdata->skip_value <= mdata->bucket) {
+				pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
+				mdp5_data->vsync_time = t;
+				sysfs_notify_dirent(mdp5_data->vsync_event_sd);
+				mdata->bucket -= mdata->skip_value;
+			} else {
+				mdata->skip_count++;
+			}
+		}
+	} else {
+		pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
+
+		mdp5_data->vsync_time = t;
+		sysfs_notify_dirent(mdp5_data->vsync_event_sd);
+	}
+#else /* qct original */
 	pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
 
 	mdp5_data->vsync_time = t;
 	sysfs_notify_dirent(mdp5_data->vsync_event_sd);
+#endif
 }
 
 /* function is called in irq context should have minimum processing */
@@ -5755,6 +5795,9 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 		if (mfd->panel_info->type != WRITEBACK_PANEL) {
 			atomic_inc(&mfd->mdp_sync_pt_data.commit_cnt);
 			rc = mdss_mdp_overlay_kickoff(mfd, NULL);
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+			lge_mdss_post_1st_kickoff(mfd);
+#endif
 		}
 	} else {
 		rc = mdss_mdp_ctl_setup(ctl);
@@ -6385,6 +6428,46 @@ int mdss_mdp_input_event_handler(struct msm_fb_data_type *mfd)
 	return rc;
 }
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+void mdss_mdp_panel_reg_backup(struct msm_fb_data_type *mfd)
+{
+	int rc;
+	struct mdss_overlay_private *mdp5_data;
+
+	pr_info("+++\n");
+	if (!mfd) {
+		pr_err("mfd is not initialized yet\n");
+		rc = -ENODEV;
+		goto end;
+	}
+
+	mdp5_data = mfd_to_mdp5_data(mfd);
+	if (!mdp5_data) {
+		pr_err("mdp data is not initialized yet\n");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	if (!mdss_fb_is_power_on(mfd)) {
+		pr_err("panel should be on state\n");
+		rc = -EPERM;
+		goto end;
+	}
+
+	rc = mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_PANEL_REG_BACKUP,
+		NULL, false);
+	if (rc) {
+		pr_err("panel reg backup failed(%d)\n", rc);
+		goto end;
+	}
+
+	mfd->need_panel_reg_backup = false;
+end:
+	pr_info("--- rc = %d\n", rc);
+	return;
+}
+#endif
+
 void mdss_mdp_footswitch_ctrl_handler(bool on)
 {
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
@@ -6450,6 +6533,12 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 	mdp5_interface->configure_panel = mdss_mdp_update_panel_info;
 	mdp5_interface->input_event_handler = mdss_mdp_input_event_handler;
 	mdp5_interface->signal_retire_fence = mdss_mdp_signal_retire_fence;
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	mdp5_interface->panel_reg_backup = mdss_mdp_panel_reg_backup;
+#endif
+
+
+
 
 	/*
 	 * Register footswitch control only for primary fb pm

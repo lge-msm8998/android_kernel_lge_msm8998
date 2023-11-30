@@ -3918,6 +3918,10 @@ int get_psy_type(struct dwc3_msm *mdwc)
 	power_supply_get_property(mdwc->usb_psy, POWER_SUPPLY_PROP_REAL_TYPE,
 			&pval);
 
+#ifndef CONFIG_LGE_USB
+	dev_info(mdwc->dev, "POWER_SUPPLY_PROP_REAL_TYPE: %d\n", pval.intval);
+#endif
+
 	return pval.intval;
 }
 
@@ -3925,6 +3929,14 @@ static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned mA)
 {
 	union power_supply_propval pval = {0};
 	int ret, psy_type;
+
+
+#ifdef CONFIG_LGE_PM_LGE_POWER_CLASS_CABLE_DETECT
+	power_supply_get_property(mdwc->usb_psy, POWER_SUPPLY_PROP_PRESENT, &pval);
+	if (!pval.intval)
+		return 0;
+#endif
+
 
 	psy_type = get_psy_type(mdwc);
 	if (psy_type == POWER_SUPPLY_TYPE_USB_FLOAT
@@ -4144,10 +4156,16 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				mdwc->drd_state = DRD_STATE_HOST_IDLE;
 				goto ret;
 			}
+#ifdef CONFIG_LGE_USB
+			if (mdwc->no_wakeup_src_in_hostmode && mdwc->in_host_mode)
+				pm_wakeup_event(mdwc->dev, DWC3_WAKEUP_SRC_TIMEOUT);
+#else
 			if (mdwc->no_wakeup_src_in_hostmode) {
 				pm_wakeup_event(mdwc->dev,
 					DWC3_WAKEUP_SRC_TIMEOUT);
 			}
+
+#endif
 		}
 		break;
 
@@ -4165,10 +4183,15 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			dbg_event(0xFF, "XHCIResume", 0);
 			if (dwc)
 				pm_runtime_resume(&dwc->xhci->dev);
+#ifdef CONFIG_LGE_USB
+			if (mdwc->no_wakeup_src_in_hostmode)
+				pm_wakeup_event(mdwc->dev, DWC3_WAKEUP_SRC_TIMEOUT);
+#else
 			if (mdwc->no_wakeup_src_in_hostmode) {
 				pm_wakeup_event(mdwc->dev,
 					DWC3_WAKEUP_SRC_TIMEOUT);
 			}
+#endif
 		}
 		break;
 

@@ -28,6 +28,12 @@
 #include "mdss_debug.h"
 #include "mdss_livedisplay.h"
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+#include "lge/lge_mdss_display.h"
+#include <soc/qcom/lge/board_lge.h>
+#include "lge/lge_mdss_dsi_panel.h"
+#endif
+
 #define DT_CMD_HDR 6
 #define DEFAULT_MDP_TRANSFER_TIME 14000
 
@@ -247,6 +253,11 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_OVERRIDE_MDSS_DSI_PANEL_RESET)
+/*
+ * mdss_dsi_panel_reset(), mdss_dsi_request_gpios() should be defined in other file.
+ */
+#else
 static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int rc = 0;
@@ -295,81 +306,6 @@ rst_gpio_err:
 	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 		gpio_free(ctrl_pdata->disp_en_gpio);
 disp_en_gpio_err:
-	return rc;
-}
-
-int mdss_dsi_bl_gpio_ctrl(struct mdss_panel_data *pdata, int enable)
-{
-	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-	int rc = 0, val = 0;
-
-	if (pdata == NULL) {
-		pr_err("%s: Invalid input data\n", __func__);
-		return -EINVAL;
-	}
-
-	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-				panel_data);
-	if (ctrl_pdata == NULL) {
-		pr_err("%s: Invalid ctrl data\n", __func__);
-		return -EINVAL;
-	}
-
-	/* if gpio is not valid */
-	if (!gpio_is_valid(ctrl_pdata->bklt_en_gpio))
-		return rc;
-
-	pr_debug("%s: enable = %d\n", __func__, enable);
-
-	/*
-	 * if gpio state is false and enable (bl level) is
-	 * non zero then toggle the gpio
-	 */
-	if (!ctrl_pdata->bklt_en_gpio_state && enable) {
-		rc = gpio_request(ctrl_pdata->bklt_en_gpio, "bklt_enable");
-		if (rc) {
-			pr_err("request bklt gpio failed, rc=%d\n", rc);
-			goto free;
-		}
-
-		if (ctrl_pdata->bklt_en_gpio_invert)
-			val = 0;
-		 else
-			val = 1;
-
-		rc = gpio_direction_output(ctrl_pdata->bklt_en_gpio, val);
-		if (rc) {
-			pr_err("%s: unable to set dir for bklt gpio val %d\n",
-						__func__, val);
-			goto free;
-		}
-		ctrl_pdata->bklt_en_gpio_state = true;
-		goto ret;
-	} else if (ctrl_pdata->bklt_en_gpio_state && !enable) {
-		/*
-		 * if gpio state is true and enable (bl level) is
-		 * zero then toggle the gpio
-		 */
-		if (ctrl_pdata->bklt_en_gpio_invert)
-			val = 1;
-		 else
-			val = 0;
-
-		rc = gpio_direction_output(ctrl_pdata->bklt_en_gpio, val);
-		if (rc)
-			pr_err("%s: unable to set dir for bklt gpio val %d\n",
-						__func__, val);
-		goto free;
-	}
-
-	/* gpio state is true and bl level is non zero */
-	goto ret;
-
-free:
-	pr_debug("%s: free bklt gpio\n", __func__);
-	ctrl_pdata->bklt_en_gpio_state = false;
-	gpio_free(ctrl_pdata->bklt_en_gpio);
-ret:
 	return rc;
 }
 
@@ -506,6 +442,82 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	}
 
 exit:
+	return rc;
+}
+#endif
+
+int mdss_dsi_bl_gpio_ctrl(struct mdss_panel_data *pdata, int enable)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	int rc = 0, val = 0;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+	if (ctrl_pdata == NULL) {
+		pr_err("%s: Invalid ctrl data\n", __func__);
+		return -EINVAL;
+	}
+
+	/* if gpio is not valid */
+	if (!gpio_is_valid(ctrl_pdata->bklt_en_gpio))
+		return rc;
+
+	pr_debug("%s: enable = %d\n", __func__, enable);
+
+	/*
+	 * if gpio state is false and enable (bl level) is
+	 * non zero then toggle the gpio
+	 */
+	if (!ctrl_pdata->bklt_en_gpio_state && enable) {
+		rc = gpio_request(ctrl_pdata->bklt_en_gpio, "bklt_enable");
+		if (rc) {
+			pr_err("request bklt gpio failed, rc=%d\n", rc);
+			goto free;
+		}
+
+		if (ctrl_pdata->bklt_en_gpio_invert)
+			val = 0;
+		 else
+			val = 1;
+
+		rc = gpio_direction_output(ctrl_pdata->bklt_en_gpio, val);
+		if (rc) {
+			pr_err("%s: unable to set dir for bklt gpio val %d\n",
+						__func__, val);
+			goto free;
+		}
+		ctrl_pdata->bklt_en_gpio_state = true;
+		goto ret;
+	} else if (ctrl_pdata->bklt_en_gpio_state && !enable) {
+		/*
+		 * if gpio state is true and enable (bl level) is
+		 * zero then toggle the gpio
+		 */
+		if (ctrl_pdata->bklt_en_gpio_invert)
+			val = 1;
+		 else
+			val = 0;
+
+		rc = gpio_direction_output(ctrl_pdata->bklt_en_gpio, val);
+		if (rc)
+			pr_err("%s: unable to set dir for bklt gpio val %d\n",
+						__func__, val);
+		goto free;
+	}
+
+	/* gpio state is true and bl level is non zero */
+	goto ret;
+
+free:
+	pr_debug("%s: free bklt gpio\n", __func__);
+	ctrl_pdata->bklt_en_gpio_state = false;
+	gpio_free(ctrl_pdata->bklt_en_gpio);
+ret:
 	return rc;
 }
 
@@ -875,6 +887,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	if ((bl_level < pdata->panel_info.bl_min) && (bl_level != 0))
 		bl_level = pdata->panel_info.bl_min;
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+	ctrl_pdata->lge_extra.cur_bl_lvl = bl_level;
+#endif
 	/* enable the backlight gpio if present */
 	mdss_dsi_bl_gpio_ctrl(pdata, bl_level);
 
@@ -916,6 +931,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	}
 }
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_OVERRIDE_MDSS_DSI_PANEL_ON)
+/*
+ * mdss_dsi_panel_on() should be defined in other file.
+ */
+#else
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
@@ -968,6 +988,7 @@ end:
 	pr_debug("%s:-\n", __func__);
 	return ret;
 }
+#endif
 
 static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 {
@@ -1008,6 +1029,11 @@ end:
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_OVERRIDE_MDSS_DSI_PANEL_OFF)
+/*
+ * mdss_dsi_panel_off() should be defined in other file.
+ */
+#else
 static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
@@ -1041,6 +1067,7 @@ end:
 	pr_debug("%s:-\n", __func__);
 	return 0;
 }
+#endif
 
 static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 	int enable)
@@ -1057,12 +1084,17 @@ static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%pK ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
+	pr_info("%s: ctrl=%pK ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
 		enable);
 
 	/* Any panel specific low power commands/config */
+	if (enable) {
+		LGE_DDIC_OP(ctrl, send_u2_cmds);
+	} else {
+		lge_send_extra_cmds_by_name(ctrl, "u3");
+	}
 
-	pr_debug("%s:-\n", __func__);
+	pr_info("%s:-\n", __func__);
 	return 0;
 }
 
@@ -1127,9 +1159,13 @@ static void mdss_dsi_parse_trigger(struct device_node *np, char *trigger,
 	}
 }
 
-
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+int mdss_dsi_parse_dcs_cmds(struct device_node *np,
+		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
+#else
 static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
+#endif
 {
 	const char *data;
 	int blen = 0, len;
@@ -1374,7 +1410,7 @@ void mdss_dsi_panel_dsc_pps_send(struct mdss_dsi_ctrl_pdata *ctrl,
 
 	pcmds.cmd_cnt = 1;
 	pcmds.cmds = &cmd;
-	pcmds.link_state = DSI_LP_MODE;
+	pcmds.link_state = DSI_HS_MODE;
 
 	mdss_dsi_panel_cmds_send(ctrl, &pcmds, CMD_REQ_COMMIT);
 }
@@ -2575,6 +2611,10 @@ static int mdss_dsi_panel_timing_from_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-framerate", &tmp);
 	pt->timing.frame_rate = !rc ? tmp : DEFAULT_FRAME_RATE;
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+	rc = of_property_read_u32(np, "lge,mdss-dsi-panel-framerate-div", &tmp);
+	pt->timing.frame_rate_div = !rc ? tmp : 0;
+#endif
 	rc = of_property_read_u64(np, "qcom,mdss-dsi-panel-clockrate", &tmp64);
 	if (rc == -EOVERFLOW) {
 		tmp64 = 0;
@@ -3036,6 +3076,12 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->panel_data.apply_display_setting =
 			mdss_dsi_panel_apply_display_setting;
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	rc = lge_mdss_dsi_panel_init(node, ctrl_pdata);
+	if (rc) {
+		pr_err("%s: fail to init lge panel features\n", __func__);
+	}
+#endif
 
 	return 0;
 }

@@ -470,6 +470,7 @@ static void kgsl_mem_entry_detach_process(struct kgsl_mem_entry *entry)
 
 	type = kgsl_memdesc_usermem_type(&entry->memdesc);
 	entry->priv->stats[type].cur -= entry->memdesc.size;
+
 	spin_unlock(&entry->priv->mem_lock);
 
 	kgsl_mmu_put_gpuaddr(&entry->memdesc);
@@ -2173,7 +2174,7 @@ static int memdesc_sg_virt(struct kgsl_memdesc *memdesc, unsigned long useraddr)
 	down_read(&current->mm->mmap_sem);
 	if (!check_vma(useraddr, memdesc->size)) {
 		up_read(&current->mm->mmap_sem);
-		ret = ~EFAULT;
+		ret = -EFAULT;
 		goto out;
 	}
 
@@ -2354,7 +2355,6 @@ static int kgsl_setup_dmabuf_useraddr(struct kgsl_device *device,
 	}
 
 	/* Setup the cache mode for cache operations */
-
 	_setup_cache_mode(entry, vma);
 	up_read(&current->mm->mmap_sem);
 	return 0;
@@ -3645,6 +3645,7 @@ static int _sparse_add_to_bind_tree(struct kgsl_mem_entry *entry,
 	return 0;
 }
 
+/* entry->bind_lock must be held by the caller */
 static int _sparse_rm_from_bind_tree(struct kgsl_mem_entry *entry,
 		struct sparse_bind_object *obj,
 		uint64_t v_offset, uint64_t size)
@@ -4315,7 +4316,6 @@ kgsl_gpumem_vm_close(struct vm_area_struct *vma)
 		return;
 
 	atomic_dec(&entry->map_count);
-
 	kgsl_mem_entry_put(entry);
 }
 

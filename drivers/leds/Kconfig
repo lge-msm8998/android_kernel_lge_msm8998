@@ -642,6 +642,11 @@ config LEDS_VERSATILE
 	  This option enabled support for the LEDs on the ARM Versatile
 	  and RealView boards. Say Y to enabled these.
 
+config LEDS_LGE_EMOTIONAL
+        tristate "Support for EMOTIONAL LEDs using PMI8998"
+	help
+	  This enables support for emotional LED using PMI8998
+
 config LEDS_QPNP_HAPTICS
 	tristate "Haptics support for QPNP PMIC"
 	depends on LEDS_CLASS && MFD_SPMI_PMIC

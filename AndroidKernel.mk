@@ -40,6 +40,11 @@ KERNEL_CONFIG_OVERRIDE := CONFIG_ANDROID_BINDER_IPC_32BIT=y
 endif
 endif
 
+ifeq ($(PRODUCT_SUPPORT_OTG), y)
+KERNEL_CONFIG_OVERRIDE := \
+	CONFIG_USB_HOST_NOTIFY=y
+endif
+
 TARGET_KERNEL_CROSS_COMPILE_PREFIX := $(strip $(TARGET_KERNEL_CROSS_COMPILE_PREFIX))
 ifeq ($(TARGET_KERNEL_CROSS_COMPILE_PREFIX),)
 KERNEL_CROSS_COMPILE := arm-eabi-
@@ -87,12 +92,15 @@ ifeq ($(TARGET_KERNEL),$(current_dir))
     KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/kernel/$(TARGET_KERNEL)
     KERNEL_SYMLINK := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
     KERNEL_USR := $(KERNEL_SYMLINK)/usr
+    KERNEL_HEADERS_TIMESTAMP := $(KERNEL_SYMLINK)/usr/build-timestamp
 else
     # Legacy style, kernel source directly under kernel
     KERNEL_LEGACY_DIR := true
     BUILD_ROOT_LOC := ../
     TARGET_KERNEL_SOURCE := kernel
     KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
+    KERNEL_USR :=
+    KERNEL_HEADERS_TIMESTAMP := $(KERNEL_OUT)/usr/build-timestamp
 endif
 
 KERNEL_CONFIG := $(KERNEL_OUT)/.config
@@ -154,6 +162,13 @@ $(KERNEL_USR): $(KERNEL_HEADERS_INSTALL)
 $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_USR)
 endif
 
+KERNEL_SOURCE_FILES := $(call find-files-in-subdirs, $(TARGET_KERNEL_SOURCE), "*", .)
+KERNEL_SOURCE_FILES := $(addprefix $(TARGET_KERNEL_SOURCE)/, $(KERNEL_SOURCE_FILES))
+
+ifeq ($(INIT_BOOTCHART2), true)
+KERNEL_CONFIG_OVERRIDE_FILES := bootchart2_defconfig
+endif
+
 $(KERNEL_OUT):
 	mkdir -p $(KERNEL_OUT)
 
@@ -164,16 +179,37 @@ $(KERNEL_CONFIG): $(KERNEL_OUT)
 			echo $(KERNEL_CONFIG_OVERRIDE) >> $(KERNEL_OUT)/.config; \
 			$(MAKE) -C $(TARGET_KERNEL_SOURCE) O=$(BUILD_ROOT_LOC)$(KERNEL_OUT) $(KERNEL_MAKE_ENV) ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) oldconfig; fi
 
-$(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_OUT) $(KERNEL_HEADERS_INSTALL)
+ifeq ($(PRODUCT_SUPPORT_EXFAT), y)
+sinclude ./device/lge/common/tuxera.mk
+endif
+
+$(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_HEADERS_INSTALL) $(KERNEL_SOURCE_FILES) | $(KERNEL_OUT)
 	$(hide) echo "Building kernel..."
 	$(hide) rm -rf $(KERNEL_OUT)/arch/$(KERNEL_ARCH)/boot/dts
 	$(MAKE) -C $(TARGET_KERNEL_SOURCE) O=$(BUILD_ROOT_LOC)$(KERNEL_OUT) $(KERNEL_MAKE_ENV) ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) $(KERNEL_CFLAGS)
 	$(MAKE) -C $(TARGET_KERNEL_SOURCE) O=$(BUILD_ROOT_LOC)$(KERNEL_OUT) $(KERNEL_MAKE_ENV) ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) $(KERNEL_CFLAGS) modules
 	$(MAKE) -C $(TARGET_KERNEL_SOURCE) O=$(BUILD_ROOT_LOC)$(KERNEL_OUT) INSTALL_MOD_PATH=$(BUILD_ROOT_LOC)../$(KERNEL_MODULES_INSTALL) INSTALL_MOD_STRIP=1 $(KERNEL_MAKE_ENV) ARCH=$(KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) modules_install
+ifeq ($(PRODUCT_SUPPORT_EXFAT), y)
+	# Make directory /vendor/lib/modules
+	@mkdir -p ./$(PRODUCT_OUT)/vendor/lib/modules
+	@cp -f ./kernel/msm-4.4/tuxera_update.sh .
+	@sh tuxera_update.sh --target target/lg.d/mobile-msm8998-new --use-cache --latest --max-cache-entries 2 --source-dir ./kernel/msm-4.4 --output-dir ./$(KERNEL_OUT) $(SUPPORT_EXFAT_TUXERA)
+	@tar -xzf tuxera-exfat*.tgz
+	@mkdir -p $(TARGET_OUT_EXECUTABLES)
+	@cp ./tuxera-exfat*/exfat/kernel-module/texfat.ko ./$(PRODUCT_OUT)/vendor/lib/modules
+	@cp ./tuxera-exfat*/exfat/tools/* $(TARGET_OUT_EXECUTABLES)
+	@./$(KERNEL_OUT)/scripts/sign-file sha1 ./$(KERNEL_OUT)/certs/signing_key.pem ./$(KERNEL_OUT)/certs/signing_key.x509 ./$(PRODUCT_OUT)/vendor/lib/modules/texfat.ko
+	@rm -f kheaders*.tar.bz2
+	@rm -f tuxera-exfat*.tgz
+	@rm -rf tuxera-exfat*
+	@rm -f tuxera_update.sh
+endif
 	$(mv-modules)
 	$(clean-module-folder)
 
-$(KERNEL_HEADERS_INSTALL): $(KERNEL_OUT)
+$(KERNEL_HEADERS_TIMESTAMP): $(KERNEL_HEADERS_INSTALL) $(KERNEL_USR)
+$(KERNEL_HEADERS_INSTALL): $(KERNEL_SOURCE_FILES) | $(KERNEL_OUT)
+	$(hide) rm -rf $(KERNEL_HEADERS_INSTALL)
 	$(hide) if [ ! -z "$(KERNEL_HEADER_DEFCONFIG)" ]; then \
 			rm -f $(BUILD_ROOT_LOC)$(KERNEL_CONFIG); \
 			$(MAKE) -C $(TARGET_KERNEL_SOURCE) O=$(BUILD_ROOT_LOC)$(KERNEL_OUT) $(KERNEL_MAKE_ENV) ARCH=$(KERNEL_HEADER_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(real_cc) $(KERNEL_HEADER_DEFCONFIG); \

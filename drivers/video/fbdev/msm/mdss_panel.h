@@ -59,6 +59,14 @@ struct panel_id {
 #define LVDS_PANEL		11	/* LVDS */
 #define DP_PANEL		12	/* LVDS */
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+/* backlight mapping table type list */
+enum lge_bl_map_type {
+	LGE_BLDFT = 0,		/* default */
+	LGE_BL = LGE_BLDFT,	/* main backlight */
+	LGE_BLMAPMAX
+};
+#endif
 #define DSC_PPS_LEN		128
 #define INTF_EVENT_STR(x)	#x
 
@@ -311,6 +319,9 @@ enum mdss_intf_events {
 	MDSS_EVENT_DSI_TIMING_DB_CTRL,
 	MDSS_EVENT_AVR_MODE,
 	MDSS_EVENT_REGISTER_CLAMP_HANDLER,
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	MDSS_EVENT_PANEL_REG_BACKUP,
+#endif
 	MDSS_EVENT_DSI_DYNAMIC_BITCLK,
 	MDSS_EVENT_UPDATE_LIVEDISPLAY,
 	MDSS_EVENT_MAX,
@@ -971,7 +982,9 @@ struct mdss_panel_timing {
 
 	u64 clk_rate;
 	char frame_rate;
-
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+	char frame_rate_div;
+#endif
 	u8 dsc_enc_total;
 	struct dsc_desc dsc;
 	struct fbc_panel_info fbc;
