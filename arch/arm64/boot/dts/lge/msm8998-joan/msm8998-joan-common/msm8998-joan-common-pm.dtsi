@@ -787,7 +787,7 @@
 	};
 };
 
-&smb138x_parallel_slave {
+&smb1381_charger {
 	lge,disable-connector-temp;
 };
 
