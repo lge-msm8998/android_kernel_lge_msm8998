@@ -211,8 +211,18 @@ void migrate_to_reboot_cpu(void)
  *	Shutdown everything and perform a clean reboot.
  *	This is not safe to call in interrupt context.
  */
+
+// DEBUG: panic when reboot is called
+// Only panic once as to not cause it to panic over and over again
+static bool PANIC_DEBUG = false;
+
 void kernel_restart(char *cmd)
 {
+	if (!PANIC_DEBUG) {
+    	PANIC_DEBUG = true;
+    	panic("First reboot call\n");
+	}
+
 	kernel_restart_prepare(cmd);
 	migrate_to_reboot_cpu();
 	syscore_shutdown();
