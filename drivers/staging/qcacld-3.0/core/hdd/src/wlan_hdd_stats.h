@@ -351,6 +351,7 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
 int wlan_hdd_get_peer_rssi(struct hdd_adapter *adapter,
 			   struct qdf_mac_addr *macaddress,
 			   struct sir_peer_sta_info *peer_sta_info);
+int wlan_hdd_get_sap_stats(struct hdd_adapter *adapter, struct station_info *info);   // LGE_PATCH
 
 /**
  * wlan_hdd_get_peer_info() - get peer info
