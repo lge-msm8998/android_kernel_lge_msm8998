@@ -24,33 +24,6 @@
 #include <soc/qcom/lge/power/lge_board_revision.h>
 #include <soc/qcom/lge/board_lge.h>
 
-#undef MODULE_PARAM_PREFIX
-#define MODULE_PARAM_PREFIX "lge."
-enum lge_panel_version {
-	LGE_PANEL_V0 = 0,
-	LGE_PANEL_V1,
-	LGE_PANEL_MAX
-};
-static int panel_flag = LGE_PANEL_V1;
-static int param_set_panel_flag(const char *val, const struct kernel_param *kp)
-{
-	if (!strcmp(val, "V1")) {
-		panel_flag = LGE_PANEL_V1;
-	} else {
-		panel_flag = 0;
-	}
-	return 0;
-}
-static int param_get_panel_flag(char *buf, const struct kernel_param *kp)
-{
-	return scnprintf(buf, PAGE_SIZE-1, "%d", panel_flag);
-}
-static struct kernel_param_ops panel_flag_ops = {
-	.set = param_set_panel_flag,
-	.get = param_get_panel_flag,
-};
-module_param_cb(panel_flag, &panel_flag_ops, NULL, S_IRUGO);
-
 extern struct mdss_panel_data *pdata_base;
 extern int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key);
@@ -116,7 +89,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	int i, rc = 0;
 
 	if (pdata == NULL) {
-		pr_err("Invalid input data\n");
+		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
 
@@ -127,20 +100,23 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	if ((mdss_dsi_is_right_ctrl(ctrl_pdata) &&
 		mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data)) ||
 			pinfo->is_dba_panel) {
-		pr_debug("%d, right ctrl gpio configuration not needed\n", __LINE__);
+		pr_debug("%s:%d, right ctrl gpio configuration not needed\n",
+			__func__, __LINE__);
 		return rc;
 	}
 
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
-		pr_debug("%d, reset line not configured\n", __LINE__);
+		pr_debug("%s:%d, reset line not configured\n",
+			   __func__, __LINE__);
 	}
 
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
-		pr_debug("%d, reset line not configured\n", __LINE__);
+		pr_debug("%s:%d, reset line not configured\n",
+			   __func__, __LINE__);
 		return rc;
 	}
 
-	pr_info("enable = %d\n", enable);
+	pr_debug("%s: enable = %d\n", __func__, enable);
 
 	if (enable) {
 		rc = mdss_dsi_request_gpios(ctrl_pdata);
@@ -153,7 +129,8 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				rc = gpio_direction_output(
 					ctrl_pdata->disp_en_gpio, 1);
 				if (rc) {
-					pr_err("unable to set dir for en gpio\n");
+					pr_err("%s: unable to set dir for en gpio\n",
+						__func__);
 					goto exit;
 				}
 			}
@@ -162,7 +139,8 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				rc = gpio_direction_output(ctrl_pdata->rst_gpio,
 					pdata->panel_info.rst_seq[0]);
 				if (rc) {
-					pr_err("unable to set dir for rst gpio\n");
+					pr_err("%s: unable to set dir for rst gpio\n",
+						__func__);
 					goto exit;
 				}
 			}
@@ -178,7 +156,8 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				rc = gpio_direction_output(
 					ctrl_pdata->bklt_en_gpio, 1);
 				if (rc) {
-					pr_err("unable to set dir for bklt gpio\n");
+					pr_err("%s: unable to set dir for bklt gpio\n",
+						__func__);
 					goto exit;
 				}
 			}
@@ -318,87 +297,8 @@ end:
 }
 #endif
 
-void lge_mdss_panel_parse_dt_blmaps_joan(struct device_node *np,
-				   struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+int lge_ddic_ops_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
-	int i, j, rc;
-	u32 *array;
-	char blmap_rev[30];
-	enum lge_panel_version p_ver = LGE_PANEL_V1;
-
-	struct lge_mdss_dsi_ctrl_pdata *lge_extra = &ctrl_pdata.lge_extra;
-	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
-
-	pinfo->blmap_size = 512;
-	array = kzalloc(sizeof(u32) * pinfo->blmap_size, GFP_KERNEL);
-
-	if (!array)
-		return;
-
-	if(lge_get_board_rev_no() < HW_REV_1_0)
-		p_ver = panel_flag;
-
-	for (i = 0; i < LGE_BLMAPMAX; i++) {
-		snprintf(blmap_rev, sizeof(blmap_rev),lge_extra->lge_blmap_list[i]);
-
-		if(p_ver == LGE_PANEL_V1)
-			strcat(blmap_rev, "_v1");
-
-		/* check if property exists */
-		if (!of_find_property(np, blmap_rev, NULL))
-			continue;
-
-		pr_info("found %s\n", blmap_rev);
-
-		rc = of_property_read_u32_array(np, blmap_rev, array,
-						pinfo->blmap_size);
-		if (rc) {
-			pr_err("%d, unable to read %s\n", __LINE__, blmap_rev);
-			goto error;
-		}
-
-		pinfo->blmap[i] = kzalloc(sizeof(int) * pinfo->blmap_size,
-				GFP_KERNEL);
-
-		if (!pinfo->blmap[i]){
-			goto error;
-		}
-
-		for (j = 0; j < pinfo->blmap_size; j++)
-			pinfo->blmap[i][j] = array[j];
-
-	}
-
-	kfree(array);
-	return;
-
-error:
-	for (i = 0; i < LGE_BLMAPMAX; i++)
-		if (pinfo->blmap[i])
-			kfree(pinfo->blmap[i]);
-	kfree(array);
-}
-
-
-void lge_mdss_panel_parse_dt_panel_ctrl_joan(struct device_node *np,
-				   struct mdss_dsi_ctrl_pdata *ctrl_pdata)
-{
-}
-
-int lge_mdss_panel_create_panel_sysfs_joan(struct class *panel)
-{
-	int rc = 0;
-
-	return rc;
-}
-
-int lge_mdss_dsi_panel_init_sub(struct lge_mdss_dsi_ctrl_pdata *lge_extra)
-{
-	int rc = 0;
-
-	lge_extra->parse_dt_blmaps = lge_mdss_panel_parse_dt_blmaps_joan;
-	lge_extra->parse_dt_panel_ctrl = lge_mdss_panel_parse_dt_panel_ctrl_joan;
-	lge_extra->create_panel_sysfs = lge_mdss_panel_create_panel_sysfs_joan;
-
-	return rc;
+	pr_info("%s: ddic_ops is not configured\n", __func__);
+	return 0;
 }
