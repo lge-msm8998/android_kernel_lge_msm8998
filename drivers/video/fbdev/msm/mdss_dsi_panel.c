@@ -3669,6 +3669,18 @@ int mdss_dsi_panel_init(struct device_node *node,
 			pr_err("%s: panel_type is LGD_SW49408_CMD_DSC_PANEL\n",
 					__func__);
 			pinfo->panel_type = LGD_SIC_LG49408_1440_2880_INCELL_CMD_PANEL;
+		} else if (strncmp(panel_name, "SW43402 cmd mode", 16) == 0) {
+			pr_err("[Display] %s: panel_type is LGD_SW43402_CMD_DSC_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIW_LG43402_1440_2880_ONCELL_CMD_PANEL;
+		} else if (strncmp(panel_name, "SW43401 cmd mode", 16) == 0) {
+			pr_err("[Display] %s: panel_type is LGD_SW43401_CMD_DSC_PANEL w/o touch\n",
+					__func__);
+			pinfo->panel_type = LGD_SIW_LG43401_NOTOUCH_CMD_PANEL;
+		} else if (strncmp(panel_name, "SW49408 cmd mode", 16) == 0) {
+			pr_err("[Display] %s: panel_type is LGD_SW49408_CMD_DSC_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIC_LG49408_1440_2880_INCELL_CMD_PANEL;
 		} else {
 				pr_err("%s: Invalid panel type\n", __func__);
 		}
