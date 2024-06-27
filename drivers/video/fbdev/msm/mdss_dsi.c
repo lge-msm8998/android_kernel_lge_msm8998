@@ -36,6 +36,30 @@
 #include "mdss_dba_utils.h"
 #include "mdss_livedisplay.h"
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+#include <soc/qcom/lge/board_lge.h>
+#include <linux/regulator/driver.h>
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_FALCON_COMMON) || IS_ENABLED(CONFIG_LGE_DISPLAY_PHOENIX_COMMON) || IS_ENABLED(CONFIG_LGE_DISPLAY_JOAN_COMMON)
+#include <linux/input/lge_touch_notify.h>
+#else
+#include <linux/input/lge_touch_notify_nos.h>
+#endif
+#include <linux/lge_panel_notify.h>
+int panel_not_connected;
+int skip_lcd_error_check;
+int laf_mode_check;
+#endif
+
+#ifdef CONFIG_LGE_DISPLAY_COMMON
+#include "lge/lge_mdss_display.h"
+extern void lge_mdss_post_dsi_event_handler(struct mdss_dsi_ctrl_pdata *ctrl, int event, void *arg);
+#endif
+
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED) && !defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+#include <soc/qcom/lge/board_lge.h>
+extern int lge_set_validate_lcd_reg(void);
+#endif
+
 #ifdef CONFIG_LGE_DISPLAY_COMMON
 extern void lge_mdss_post_dsi_event_handler(struct mdss_dsi_ctrl_pdata *ctrl, int event, void *arg);
 #endif
@@ -373,6 +397,28 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev,
 	return rc;
 }
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+int detect_factory_cable(void)
+{
+	int factory_cable = 0;
+
+	switch (lge_get_boot_mode()) {
+		case LGE_BOOT_MODE_QEM_56K:
+		case LGE_BOOT_MODE_QEM_130K:
+		case LGE_BOOT_MODE_QEM_910K:
+		case LGE_BOOT_MODE_PIF_56K:
+		case LGE_BOOT_MODE_PIF_130K:
+		case LGE_BOOT_MODE_PIF_910K:
+			factory_cable = 1;
+			break;
+		default:
+			break;
+	}
+
+	return factory_cable;
+}
+#endif
+
 #if IS_ENABLED(CONFIG_LGE_DISPLAY_OVERRIDE_MDSS_DSI_PANEL_POWER_OFF)
 /*
  * mdss_dsi_panel_power_off() should be defined in other file.
@@ -464,13 +510,21 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 static int mdss_dsi_panel_power_lp(struct mdss_panel_data *pdata, int enable)
 {
 	/* Panel power control when entering/exiting lp mode */
+#if	defined(CONFIG_LGE_DISPLAY_AMBIENT_SUPPORTED)
+	return !enable;
+#else
 	return 0;
+#endif
 }
 
 static int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata,
 	int power_state)
 {
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
 	int ret = 0;
+#else
+	int ret;
+#endif
 	struct mdss_panel_info *pinfo;
 
 	if (pdata == NULL) {
@@ -487,15 +541,26 @@ static int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata,
 		return 0;
 	}
 
+#if !defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
 	/*
 	 * If a dynamic mode switch is pending, the regulators should not
 	 * be turned off or on.
 	 */
 	if (pdata->panel_info.dynamic_switch_pending)
 		return 0;
+#endif
 
 	switch (power_state) {
 	case MDSS_PANEL_POWER_OFF:
+#ifdef CONFIG_LGE_LCD_POWER_CTRL
+		if(pinfo->power_ctrl || pinfo->panel_dead)
+		{
+			pr_err("[Display]  %s: panel power off , dynamic switching = %d ...\n", __func__,
+                                pdata->panel_info.dynamic_switch_pending);
+			ret = lge_panel_power_off(pdata);
+		}
+		else
+#endif
 	case MDSS_PANEL_POWER_LCD_DISABLED:
 		/* if LCD has not been disabled, then disable it now */
 		if ((pinfo->panel_power_state != MDSS_PANEL_POWER_LCD_DISABLED)
@@ -503,10 +568,19 @@ static int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata,
 			ret = mdss_dsi_panel_power_off(pdata);
 		break;
 	case MDSS_PANEL_POWER_ON:
-		if (mdss_dsi_is_panel_on_lp(pdata))
+		if (mdss_dsi_is_panel_on_lp(pdata)) {
 			ret = mdss_dsi_panel_power_lp(pdata, false);
-		else
+		} else {
+#ifdef CONFIG_LGE_LCD_POWER_CTRL
+			if(pinfo->power_ctrl || pinfo->panel_dead){
+				if(pinfo->panel_dead)
+					usleep_range(2000,2000);
+				ret = lge_panel_power_on(pdata);
+			}
+			else
+#endif
 			ret = mdss_dsi_panel_power_on(pdata);
+		}
 		break;
 	case MDSS_PANEL_POWER_LP1:
 	case MDSS_PANEL_POWER_LP2:
@@ -524,8 +598,13 @@ static int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata,
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+void mdss_dsi_put_dt_vreg_data(struct device *dev,
+	struct dss_module_power *module_power)
+#else
 static void mdss_dsi_put_dt_vreg_data(struct device *dev,
 	struct dss_module_power *module_power)
+#endif
 {
 	if (!module_power) {
 		pr_err("%s: invalid input\n", __func__);
@@ -539,9 +618,15 @@ static void mdss_dsi_put_dt_vreg_data(struct device *dev,
 	module_power->num_vreg = 0;
 }
 
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+int mdss_dsi_get_dt_vreg_data(struct device *dev,
+	struct device_node *of_node, struct dss_module_power *mp,
+	enum dsi_pm_type module)
+#else
 static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 	struct device_node *of_node, struct dss_module_power *mp,
 	enum dsi_pm_type module)
+#endif
 {
 	int i = 0, rc = 0;
 	u32 tmp = 0;
@@ -1486,12 +1571,22 @@ static int mdss_dsi_update_panel_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		pinfo->mipi.vsync_enable = 1;
 		pinfo->mipi.hw_vsync_mode = 1;
 		pinfo->partial_update_enabled = pinfo->partial_update_supported;
+		pinfo->ulps_feature_enabled = 1;
+		pinfo->ulps_suspend_enabled = 1;
+#if defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+		pinfo->mode_switch = VIDEO_TO_CMD;
+#endif
 	} else {	/*video mode*/
 		pinfo->mipi.mode = DSI_VIDEO_MODE;
 		pinfo->type = MIPI_VIDEO_PANEL;
 		pinfo->mipi.vsync_enable = 0;
 		pinfo->mipi.hw_vsync_mode = 0;
 		pinfo->partial_update_enabled = 0;
+		pinfo->ulps_feature_enabled = 0;
+		pinfo->ulps_suspend_enabled = 1;
+#if defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+		pinfo->mode_switch = CMD_TO_VIDEO;
+#endif
 	}
 
 	ctrl_pdata->panel_mode = pinfo->mipi.mode;
@@ -1507,6 +1602,9 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	int cur_power_state;
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED) && !defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+	static int dic_vdds_set = 1;
+#endif
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -1537,6 +1635,13 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		pr_debug("%s: panel already on\n", __func__);
 		goto end;
 	}
+
+#if defined(CONFIG_LGE_DISPLAY_AMBIENT_SUPPORTED)
+	if (mdss_dsi_is_panel_on_lp(pdata)) {
+		pr_info("%s: panel already on (lp state)\n", __func__);
+		goto end;
+	}
+#endif
 
 	ret = mdss_dsi_panel_power_ctrl(pdata, MDSS_PANEL_POWER_ON);
 	if (ret) {
@@ -1602,6 +1707,18 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 				  MDSS_DSI_ALL_CLKS, MDSS_DSI_CLK_OFF);
 
 end:
+#if defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+	if(pdata->panel_info.type == MIPI_VIDEO_PANEL)
+		pinfo->partial_update_enabled = 0;
+#endif
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED) && !defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+	if (lge_get_factory_boot()) {
+		if(dic_vdds_set) {
+			lge_set_validate_lcd_reg();
+			dic_vdds_set = 0;
+		}
+	}
+#endif
 	pr_debug("%s-:\n", __func__);
 	return ret;
 }
@@ -1716,7 +1833,11 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 	}
 
 	if (!(ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT)) {
+#if defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+		{
+#else
 		if (!pdata->panel_info.dynamic_switch_pending) {
+#endif
 			ATRACE_BEGIN("dsi_panel_on");
 			ret = ctrl_pdata->on(pdata);
 			if (ret) {
@@ -1789,6 +1910,7 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata, int power_state)
 
 	mdss_dsi_op_mode_config(DSI_CMD_MODE, pdata);
 
+#if !defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
 	if (pdata->panel_info.dynamic_switch_pending) {
 		pr_info("%s: switching to %s mode\n", __func__,
 			(pdata->panel_info.mipi.mode ? "video" : "command"));
@@ -1799,6 +1921,7 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata, int power_state)
 			mdss_dsi_set_tear_off(ctrl_pdata);
 		}
 	}
+#endif
 
 	if ((pdata->panel_info.type == MIPI_CMD_PANEL) &&
 		mipi->vsync_enable && mipi->hw_vsync_mode) {
@@ -1810,7 +1933,11 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata, int power_state)
 	}
 
 	if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
+#if defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+		{
+#else
 		if (!pdata->panel_info.dynamic_switch_pending) {
+#endif
 			ATRACE_BEGIN("dsi_panel_off");
 			ret = ctrl_pdata->off(pdata);
 			if (ret) {
@@ -3001,6 +3128,9 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		pdata->panel_info.esd_rdy = true;
+#if defined(CONFIG_LGE_DISPLAY_AOD_SUPPORTED) && defined (CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+		goto notify;
+#endif
 		break;
 	case MDSS_EVENT_BLANK:
 		power_state = (int) (unsigned long) arg;
@@ -3152,6 +3282,21 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	lge_mdss_post_dsi_event_handler(ctrl_pdata, event, arg);
 #endif
 	return rc;
+#if defined(CONFIG_LGE_DISPLAY_AOD_SUPPORTED) && defined(CONFIG_LGE_DISPLAY_DYN_DSI_MODE_SWITCH)
+notify:
+	{
+		int param;
+		param = pinfo->aod_cur_mode;
+		if (pinfo->aod_cur_mode == AOD_PANEL_MODE_U3_UNBLANK){
+			usleep_range(60000,60000);
+			if(touch_notifier_call_chain(LCD_EVENT_LCD_MODE,
+								(void *)&param))
+				pr_err("[AOD] Failt to send notify to touch\n");
+		}
+	}
+	pr_debug("%s-:event=%d, rc=%d\n", __func__, event, rc);
+	return rc;
+#endif
 }
 
 static int mdss_dsi_set_override_cfg(char *override_cfg,
@@ -3669,6 +3814,17 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 			 */
 			ctrl_pdata->bklt_ctrl = UNKNOWN_CTRL;
 		}
+#ifdef CONFIG_LGE_DISPLAY_BL_EXTENDED
+		rc = mdss_panel_parse_blex_settings(dsi_pan_node, ctrl_pdata);
+		if (rc) {
+			pr_warn("%s: dsi bl settings parse failed\n", __func__);
+			/* Panels like AMOLED and dsi2hdmi chip
+			 * does not need backlight control.
+			 * So we should not fail probe here.
+			 */
+			ctrl_pdata->bkltex_ctrl = UNKNOWN_CTRL;
+		}
+#endif
 	} else {
 		ctrl_pdata->bklt_ctrl = UNKNOWN_CTRL;
 	}
@@ -4612,6 +4768,22 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 		ctrl_pdata->lcd_mode_sel_gpio = -EINVAL;
 	}
 
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	if (gpio_request(ctrl_pdata->rst_gpio, "disp_rst-n"))
+		pr_err("request reset gpio failed\n");
+
+	panel_not_connected = lge_get_lk_panel_status();
+	pr_debug("%s: lk panel init fail[%d]\n",
+			__func__, panel_not_connected);
+
+	if (detect_factory_cable()){
+		pr_info("boot mode : factory cable detected\n");
+		if (!lge_get_mfts_mode() && panel_not_connected){
+			skip_lcd_error_check = 1;
+			pr_info("no MFTS and panel not connected. will skip lcd error check routine\n");
+		}
+	}
+#endif
 	return 0;
 }
 
@@ -4774,6 +4946,7 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 	 */
 	sdata = ctrl_pdata->shared_data;
 
+#ifndef CONFIG_LGE_DISPLAY_COMMON
 	if (pinfo->ulps_suspend_enabled) {
 		rc = msm_dss_enable_vreg(
 			sdata->power_data[DSI_PHY_PM].vreg_config,
@@ -4784,6 +4957,7 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 			return rc;
 		}
 	}
+#endif
 
 	pinfo->cont_splash_enabled =
 		ctrl_pdata->mdss_util->panel_intf_status(pinfo->pdest,

@@ -24,14 +24,13 @@
 #include <soc/qcom/lge/lge_cable_detection.h>
 #endif
 #include <linux/module.h>
-//#include <linux/power/lge_battery_id.h>
+#ifdef CONFIG_LGE_PM_LGE_POWER_CLASS_BATTERY_ID_CHECKER
+#include <linux/power/lge_battery_id.h>
+#endif
 #include <linux/lge_display_debug.h>
 #include "lge_mdss_display.h"
 
-extern int get_factory_cable(void);
-#define LGEUSB_FACTORY_56K 1
-#define LGEUSB_FACTORY_130K 2
-#define LGEUSB_FACTORY_910K 3
+extern lge_factory_cable_t lge_get_factory_cable(void);
 
 #if IS_ENABLED(CONFIG_LGE_DISPLAY_BL_EXTENDED)
 extern int mdss_fb_mode_switch(struct msm_fb_data_type *mfd, u32 mode);
@@ -94,21 +93,21 @@ static inline bool is_blank_called(void)
 
 static inline bool is_factory_cable(void)
 {
-	unsigned int cable_info;
+	lge_factory_cable_t cable_info;
 #ifdef CONFIG_LGE_PM_LGE_POWER_CLASS_CABLE_DETECT
-	cable_info = get_factory_cable();
+	cable_info = lge_get_factory_cable();
 #if !defined(CONFIG_LGE_PM_EMBEDDED_BATTERY)
-		if (cable_info == LGEUSB_FACTORY_56K ||
-			cable_info == LGEUSB_FACTORY_130K ||
-			cable_info == LGEUSB_FACTORY_910K) {
+		if (cable_info == LGE_FACTORY_CABLE_56K ||
+			cable_info == LGE_FACTORY_CABLE_130K ||
+			cable_info == LGE_FACTORY_CABLE_910K) {
 			pr_info("%s : cable_type = factory(%d) \n",__func__, cable_info);
 			return true;
 		} else {
 			return false;
 		}
 #else
-		if (cable_info == LGEUSB_FACTORY_130K ||
-			cable_info == LGEUSB_FACTORY_910K) {
+		if (cable_info == LGE_FACTORY_CABLE_130K ||
+			cable_info == LGE_FACTORY_CABLE_910K) {
 			pr_info("%s : cable_type = factory(%d) \n",__func__, cable_info);
 			return true;
 		} else {
@@ -593,7 +592,7 @@ void mdss_fb_set_backlight_ex(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 			if (mfd->bl_level_ex != bkl_lvl)
 				bl_notify_needed = true;
 			pr_debug("backlight sent to panel ex:%d\n", temp);
-			DISP_DEBUG(BL, "backlight sent to panel ex:%d\n", temp);
+			DISP_DEBUG(DISP_BL, "backlight sent to panel ex:%d\n", temp);
 			lge_set_to_blex(mfd);
 			pdata->set_backlight(pdata, temp);
 			lge_restore_from_blex(mfd);

@@ -252,10 +252,12 @@ static int mdss_mdp_writeback_cdm_setup(struct mdss_mdp_writeback_ctx *ctx,
 {
 	struct mdp_cdm_cfg setup;
 
+/*
 	if (fmt->is_yuv)
 		setup.csc_type = MDSS_MDP_CSC_RGB2YUV_601L;
 	else
 		setup.csc_type = MDSS_MDP_CSC_RGB2RGB;
+*/
 
 	switch (fmt->chroma_sample) {
 	case MDSS_MDP_CHROMA_RGB:

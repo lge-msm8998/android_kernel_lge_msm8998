@@ -269,14 +269,14 @@ static ssize_t display_debug_level_store(struct device *dev,
 	int value = 0;
 
 	if (sscanf(buf, "%d", &value) != 1) {
-		DISP_ERR(NONE, "sccanf buf error!\n");
+		DISP_ERR(DISP_NONE, "sccanf buf error!\n");
 		return len;
 	}
 	if (value < LEVEL_ERR || value >= LEVEL_MAX) {
-		DISP_ERR(NONE, "Fail to set debug level!\n");
+		DISP_ERR(DISP_NONE, "Fail to set debug level!\n");
 		return len;
 	} else {
-		DISP_INFO(NONE, "Change debug from %d to %d\n", display_debug_level, value);
+		DISP_INFO(DISP_NONE, "Change debug from %d to %d\n", display_debug_level, value);
 		display_debug_level = value;
 	}
 	return len;

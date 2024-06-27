@@ -13,6 +13,7 @@
 #ifndef _LGE_BOARD_REVISION_H
 #define _LGE_BOARD_REVISION_H
 
+#if defined(CONFIG_MACH_MSM8998_PHOENIX)
 enum hw_rev_no {
 	HW_REV_0,
 	HW_REV_0_1,
@@ -29,6 +30,70 @@ enum hw_rev_no {
 	HW_REV_1_3,
 	HW_REV_MAX
 };
+#elif defined(CONFIG_MACH_MSM8996_LUCYE) || defined (CONFIG_MACH_MSM8996_FALCON)
+enum hw_rev_no {
+	HW_REV_EVB1 = 0,
+	HW_REV_EVB2,
+	HW_REV_EVB3,
+	HW_REV_0,
+	HW_REV_0_1,
+	HW_REV_0_2,
+	HW_REV_0_3,
+	HW_REV_0_4,
+	HW_REV_A,
+	HW_REV_B,
+	HW_REV_C,
+	HW_REV_D,
+	HW_REV_1_0,
+	HW_REV_1_1,
+	HW_REV_1_2,
+	HW_REV_1_3,
+	HW_REV_1_4,
+	HW_REV_1_5,
+	HW_REV_1_6,
+	HW_REV_MAX
+};
+#elif defined(CONFIG_MACH_MSM8996_ELSA) || defined(CONFIG_MACH_MSM8996_ANNA) || defined(CONFIG_MACH_MSM8998_LUCY) || defined(CONFIG_MACH_MSM8998_JOAN)
+enum hw_rev_no {
+	HW_REV_EVB1 = 0,
+	HW_REV_EVB2,
+	HW_REV_EVB3,
+	HW_REV_0,
+	HW_REV_0_1,
+	HW_REV_0_2,
+	HW_REV_A,
+	HW_REV_B,
+	HW_REV_C,
+	HW_REV_D,
+	HW_REV_E,
+	HW_REV_F,
+	HW_REV_1_0,
+	HW_REV_1_1,
+	HW_REV_1_2,
+	HW_REV_1_3,
+	HW_REV_MAX
+};
+#else
+enum hw_rev_no {
+	HW_REV_EVB1 = 0,
+	HW_REV_EVB2,
+	HW_REV_EVB3,
+	HW_REV_0,
+	HW_REV_0_1,
+	HW_REV_A,
+	HW_REV_B,
+	HW_REV_C,
+	HW_REV_D,
+	HW_REV_E,
+	HW_REV_F,
+	HW_REV_G,
+	HW_REV_1_0,
+	HW_REV_1_1,
+	HW_REV_1_2,
+	HW_REV_1_3,
+	HW_REV_MAX
+};
+#endif
 
 extern char *rev_str[];
 

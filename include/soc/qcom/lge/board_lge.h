@@ -1,7 +1,7 @@
 #ifndef __ASM_ARCH_MSM_BOARD_LGE_H
 #define __ASM_ARCH_MSM_BOARD_LGE_H
 
-#if defined(CONFIG_LGE_DISPLAY_COMMON)
+#if defined(CONFIG_LGE_LCD_MFTS_MODE)
 extern int lge_get_mfts_mode(void);
 #endif
 
@@ -47,7 +47,16 @@ bool lge_get_android_dlcomplete(void);
 lge_laf_mode_t lge_get_laf_mode(void);
 #endif
 
+#if defined(CONFIG_LGE_PM_LGE_POWER_CLASS_CABLE_DETECT)
+#include <soc/qcom/lge/power/lge_cable_detect.h>
+cable_boot_type lge_get_boot_cable(void);
+#endif
+
 extern int lge_get_bootreason(void);
+
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+extern int lge_get_bootreason_with_lcd_dimming(void);
+#endif
 
 #ifdef CONFIG_MACH_LGE
 bool lge_check_recoveryboot(void);
@@ -68,6 +77,53 @@ typedef enum {
 	NONE,
 } lge_sku_carrier_t;
 int lge_get_sku_carrier(void);
+#endif
+
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+int lge_get_panel(void);
+void lge_set_panel(int);
+int lge_get_panel_flag_status(void);
+int lge_get_uefi_panel_status(void);
+#endif
+
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+int lge_get_lk_panel_status(void);
+int lge_get_dsv_status(void);
+int lge_get_panel(void);
+void lge_set_panel(int);
+#endif
+
+#if defined(CONFIG_LGE_PANEL_MAKER_ID_SUPPORT)
+enum panel_maker_id_type {
+	LGD_LG4946 = 0,
+	LGD_LG4945,
+	LGD_S3320,
+	LGD_TD4302,
+	PANEL_MAKER_ID_MAX
+};
+
+enum panel_maker_id_type lge_get_panel_maker_id(void);
+#endif
+
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+enum panel_revision_id_type {
+	LGD_LG4946_REV0 = 0,
+	LGD_LG4946_REV1,
+	LGD_LG4946_REV2,
+	LGD_LG4946_REV3,
+	PANEL_REVISION_ID_MAX
+};
+
+enum panel_revision_id_type lge_get_panel_revision_id(void);
+#endif
+
+#ifdef CONFIG_LGE_LCD_TUNING
+struct lcd_platform_data {
+int (*set_values) (int *tun_lcd_t);
+int (*get_values) (int *tun_lcd_t);
+};
+
+void __init lge_add_lcd_misc_devices(void);
 #endif
 
 #endif /* __ASM_ARCH_MSM_BOARD_LGE_H */

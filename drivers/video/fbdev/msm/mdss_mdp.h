@@ -57,8 +57,17 @@
 #define C0_G_Y		0	/* G/luma */
 
 /* wait for at most 2 vsync for lowest refresh rate (24hz) */
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+#define KOFF_TIMEOUT_MS 500
+#else
 #define KOFF_TIMEOUT_MS 84
+#endif
+
+#if defined(CONFIG_LGE_DISPLAY_LUCYE_COMMON)
+#define KOFF_TIMEOUT msecs_to_jiffies(500)
+#else
 #define KOFF_TIMEOUT msecs_to_jiffies(KOFF_TIMEOUT_MS)
+#endif
 
 #define OVERFETCH_DISABLE_TOP		BIT(0)
 #define OVERFETCH_DISABLE_BOTTOM	BIT(1)
@@ -140,6 +149,7 @@
 #define HW_CURSOR_STAGE(mdata) \
 	(((mdata)->max_target_zorder + MDSS_MDP_STAGE_0) - 1)
 
+#define QCT_MM_NOC_PATCH /*temp patch for MM NOC error SR#02184707*/
 #define BITS_TO_BYTES(x) DIV_ROUND_UP(x, BITS_PER_BYTE)
 
 #define PP_PROGRAM_PA		0x1

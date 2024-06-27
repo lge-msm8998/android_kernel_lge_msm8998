@@ -449,6 +449,12 @@ config LGE_INTERVAL_MONITOR
 	---help---
 	This feature provides Frame Interval Monitor scheme.
 
+config LGE_DISPLAY_COLOR_MANAGER
+	bool "Enable LGE_DISPLAY_COLOR_MANAGER"
+	default n
+	---help---
+	Display Color Manager by digital gamma & sat/hue/sharpness
+
 config LGE_FBCN
 	depends on LGE_DISPLAY_COMMON
 	bool "Frame Based Clock Normalizer"

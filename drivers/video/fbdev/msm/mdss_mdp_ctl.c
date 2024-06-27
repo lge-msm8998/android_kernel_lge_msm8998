@@ -28,6 +28,10 @@
 #include "mdss_mdp_trace.h"
 #include "mdss_debug.h"
 
+#if defined(CONFIG_LGE_DISPLAY_AOD_SUPPORTED)
+#include "lge/lge_mdss_aod.h"
+#endif
+
 #if defined(CONFIG_LGE_INTERVAL_MONITOR)
 #include "lge/lge_interval_monitor.h"
 #endif
@@ -980,7 +984,11 @@ static u32 mdss_mdp_calc_prefill_line_time(struct mdss_mdp_ctl *ctl,
 {
 	u32 prefill_us = 0;
 	u32 prefill_amortized = 0;
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+#else
+	struct mdss_data_type *mdata;
+#endif
 	struct mdss_mdp_mixer *mixer;
 	struct mdss_panel_info *pinfo;
 	u32 fps, v_total;
@@ -5692,6 +5700,9 @@ int mdss_mdp_display_wait4comp(struct mdss_mdp_ctl *ctl)
 	if (ctl->ops.wait_fnc)
 		ret = ctl->ops.wait_fnc(ctl, NULL);
 	ATRACE_END("wait_fnc");
+#if defined(CONFIG_LGE_INTERVAL_MONITOR)
+	lge_interval_notify(ktime_get());
+#endif
 
 	trace_mdp_commit(ctl);
 
@@ -5796,7 +5807,13 @@ static void mdss_mdp_force_border_color(struct mdss_mdp_ctl *ctl)
 	if (ctl->mixer_right)
 		ctl->mixer_right->params_changed++;
 }
-
+#if (defined CONFIG_LGE_PM_TRITON)
+#include <linux/lib_triton.h>
+#ifdef FPS_BOOST
+u64 last_commit_ms;
+EXPORT_SYMBOL(last_commit_ms);
+#endif
+#endif
 int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 	struct mdss_mdp_commit_cb *commit_cb)
 {
@@ -6136,6 +6153,9 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 	}
 
 	ctl->play_cnt++;
+#if (defined CONFIG_LGE_PM_TRITON && defined FPS_BOOST)
+	last_commit_ms = ktime_to_ms(ktime_get());
+#endif
 	ATRACE_END("flush_kickoff");
 
 #if defined(CONFIG_LGE_INTERVAL_MONITOR)

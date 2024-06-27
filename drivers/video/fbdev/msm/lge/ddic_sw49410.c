@@ -13,6 +13,22 @@
 
 #define BLMAP_HL_MODE_OFFSET 	4
 
+#define NUM_DG_PRESET		10
+#define STEP_GC_PRESET      5
+
+#define LGE_SCREEN_TUNE_OFF 0
+#define LGE_SCREEN_TUNE_ON  1
+#define LGE_SCREEN_TUNE_GAM 2
+#define LGE_SCREEN_TUNE_GAL 3
+#define LGE_SAT_GAM_MODE    3
+#define LGE_SAT_GAL_MODE    5
+
+enum {
+	PRESET_SETP0_OFFSET = 0,
+	PRESET_SETP1_OFFSET = 2,
+	PRESET_SETP2_OFFSET = 5
+};
+
 static char sha_ctrl_values[NUM_SHA_CTRL] = {0x00, 0x0D, 0x1A, 0x30, 0xD2};
 
 static char sc_ctrl_values[NUM_SC_CTRL] = {0x00, 0x0F, 0x08, 0x0C};

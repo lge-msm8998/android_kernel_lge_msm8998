@@ -27,9 +27,23 @@
 static enum hw_rev_no lge_bd_rev = HW_REV_MAX;
 
 /* CAUTION: These strings are come from LK. */
+#if defined(CONFIG_MACH_MSM8998_PHOENIX)
 char *rev_str[] = {"rev_0", "rev_01", "rev_02", "rev_a", "rev_b",
 	"rev_c", "rev_d", "rev_e", "rev_f", "rev_10", "rev_11", "rev_12", "rev_13",
 	"reserved"};
+#elif defined(CONFIG_MACH_MSM8996_LUCYE) || defined (CONFIG_MACH_MSM8996_FALCON)
+char *rev_str[] = {"evb1", "evb2", "evb3", "rev_0", "rev_01", "rev_02", "rev_03", "rev_04",
+	"rev_a", "rev_b", "rev_c", "rev_d", "rev_10", "rev_11", "rev_12", "rev_13", "rev_14", "rev_15", "rev_16",
+	"reserved"};
+#elif defined(CONFIG_MACH_MSM8996_ELSA) || defined(CONFIG_MACH_MSM8996_ANNA) || defined(CONFIG_MACH_MSM8998_LUCY) || defined(CONFIG_MACH_MSM8998_JOAN)
+char *rev_str[] = {"evb1", "evb2", "evb3", "rev_0", "rev_01", "rev_02", "rev_a", "rev_b",
+	"rev_c", "rev_d", "rev_e", "rev_f", "rev_10", "rev_11", "rev_12", "rev_13",
+	"reserved"};
+#else
+char *rev_str[] = {"evb1", "evb2", "evb3", "rev_0", "rev_01", "rev_f", "rev_b", "rev_c",
+	"rev_d", "rev_e", "rev_a", "rev_g", "rev_10", "rev_11", "rev_12",
+	"reserved"};
+#endif
 
 enum hw_rev_no lge_get_board_rev_no(void)
 {
