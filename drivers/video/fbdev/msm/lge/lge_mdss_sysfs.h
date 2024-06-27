@@ -55,15 +55,7 @@ static int get_data(struct device *dev, struct fb_info **pfbi, struct msm_fb_dat
 	struct msm_fb_data_type *mfd = NULL; \
 	struct mdss_panel_data *pdata = NULL; \
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL; \
-	if (get_data(dev, &fbi, &mfd, &pdata, &ctrl)) \
-		return -EINVAL; \
-
-#define SKIP_WHILE_CONT_SPLASH_ENABLED() \
-	do { \
-		if (ctrl->panel_data.panel_info.cont_splash_enabled) { \
-			pr_warn("%s: skip while cont. splash is enabled\n", __func__); \
-			return ret; \
-		} \
-	} while(0)
+	if(get_data(dev, &fbi, &mfd, &pdata, &ctrl))  \
+		return -EINVAL;  \
 
 #endif //_H_LGE_MDSS_SYSFS_

@@ -2072,6 +2072,7 @@ static void mdss_mdp_hw_rev_caps_init(struct mdss_data_type *mdata)
 		mdss_mdp_init_default_prefill_factors(mdata);
 		mdss_set_quirk(mdata, MDSS_QUIRK_DSC_RIGHT_ONLY_PU);
 		mdss_set_quirk(mdata, MDSS_QUIRK_DSC_2SLICE_PU_THRPUT);
+		mdss_set_quirk(mdata, MDSS_QUIRK_HDR_SUPPORT_ENABLED);
 		break;
 	case MDSS_MDP_HW_REV_105:
 	case MDSS_MDP_HW_REV_109:
@@ -2849,12 +2850,15 @@ static DEVICE_ATTR(bw_mode_bitmap, S_IRUGO | S_IWUSR | S_IWGRP,
 		mdss_mdp_read_max_limit_bw, mdss_mdp_store_max_limit_bw);
 
 #ifdef CONFIG_LGE_VSYNC_SKIP
-void vsync_skip_set_fps(int fps)
+static ssize_t fps_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
 {
-	if (mdss_res == NULL) {
-		pr_warn("%s: mdss_res is NULL\n");
-		return;
-	}
+	ulong fps;
+
+	if (!count)
+		return -EINVAL;
+
+	fps = simple_strtoul(buf, NULL, 10);
 
 	if (fps == 0 || fps >= 60) {
 		mdss_res->enable_skip_vsync = 0;
@@ -2874,20 +2878,6 @@ void vsync_skip_set_fps(int fps)
 		mdss_res->skip_first = false;
 		pr_debug("Enable frame skip: Set to %lu fps.\n", fps);
 	}
-}
-
-static ssize_t fps_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	ulong fps;
-
-	if (!count)
-		return -EINVAL;
-
-	fps = simple_strtoul(buf, NULL, 10);
-
-	vsync_skip_set_fps(fps);
-
 	return count;
 }
 

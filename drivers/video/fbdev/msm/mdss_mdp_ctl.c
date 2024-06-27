@@ -27,6 +27,7 @@
 #include "mdss_mdp.h"
 #include "mdss_mdp_trace.h"
 #include "mdss_debug.h"
+
 #if defined(CONFIG_LGE_INTERVAL_MONITOR)
 #include "lge/lge_interval_monitor.h"
 #endif

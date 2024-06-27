@@ -78,7 +78,7 @@ ssize_t fbcn_en_store(struct device *dev,
 {
 	int enable;
 
-	if (sscanf(buf, "%d", &enable) < 1) {
+	if (sscanf(buf, "%u", &enable) < 1) {
 		pr_warn("%s: Failed to store enable\n", __func__);
 		return -EINVAL;
 	}
@@ -107,7 +107,7 @@ ssize_t fbcn_en_show(struct device *dev,
 		     struct device_attribute *attr, char *buf)
 {
 	int ret = 0;
-	ret = snprintf(buf, PAGE_SIZE, "%d\n", fstats.enable);
+	ret = snprintf(buf, PAGE_SIZE, "%u\n", fstats.enable);
 	return ret;
 }
 

@@ -18,13 +18,13 @@
 #include "../mdss_mdp.h"
 
 struct fbcn_interval_stats {
-    u64 interval;
-    u64 i_upper;
-    u64 i_lower;
-    int enable;
-    int init;
-    struct mutex fbcn_lock;
-    struct notifier_block nb;
+	u64 interval;
+	u64 i_upper;
+	u64 i_lower;
+	int enable;
+	int init;
+	struct mutex fbcn_lock;
+	struct notifier_block nb;
 };
 
 #endif /* LGE_FBCN_H */

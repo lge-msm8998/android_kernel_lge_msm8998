@@ -197,21 +197,6 @@ struct mdp_csc_cfg mdp_csc_8bit_convert[MDSS_MDP_MAX_CSC] = {
 	},
 };
 
-#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
-struct mdp_csc_cfg dmb_csc_convert = {
-	0,
-	{
-		0x0220, 0x0000, 0x0331, //272
-		0x0248, 0xff37, 0xfe60, //292
-		0x0268, 0x0409, 0x0000, //308
-	},
-	{ 0xffc0, 0xfe00, 0xfe00,},
-	{ 0x0, 0x0, 0x0,},
-	{ 0x0, 0x3ff, 0x0, 0x3ff, 0x0, 0x3ff,},
-	{ 0x0, 0x3ff, 0x0, 0x3ff, 0x0, 0x3ff,},
-};
-#endif /* LGE_BROADCAST */
-
 struct mdp_csc_cfg mdp_csc_10bit_convert[MDSS_MDP_MAX_CSC] = {
 	[MDSS_MDP_CSC_YUV2RGB_601L] = {
 		0,
@@ -595,14 +580,6 @@ static struct mdp_pp_feature_ops *pp_ops;
 
 static DEFINE_MUTEX(mdss_pp_mutex);
 static struct mdss_pp_res_type *mdss_pp_res;
-
-#if defined(CONFIG_LGE_BROADCAST_TDMB) || defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
-static int dmb_status; // on - 1, off - 0
-int pp_set_dmb_status(int flag) {
-	dmb_status = flag;
-	return 0;
-}
-#endif /* LGE_BROADCAST */
 
 static u32 pp_hist_read(char __iomem *v_addr,
 				struct pp_hist_col_info *hist_info);
@@ -1210,18 +1187,8 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 	    IS_MDSS_MAJOR_MINOR_SAME(mdata->mdp_rev, MDSS_MDP_HW_REV_300)) {
 		if (pipe->src_fmt->is_yuv) {
 			/* TODO: check csc cfg from PP block */
-#if !defined(CONFIG_LGE_BROADCAST_TDMB) && !defined(CONFIG_LGE_BROADCAST_ISDBT_JAPAN)
-			mdss_mdp_csc_setup(MDSS_MDP_BLOCK_SSPP_10, pipe->num,
-            pp_vig_csc_pipe_val(pipe));
-#else
-		if(dmb_status == 1) {
-			mdss_mdp_csc_setup_data(MDSS_MDP_BLOCK_SSPP_10, pipe->num,
-			&dmb_csc_convert);
-		} else {
 			mdss_mdp_csc_setup(MDSS_MDP_BLOCK_SSPP_10, pipe->num,
 			pp_vig_csc_pipe_val(pipe));
-		}
-#endif /* LGE_BROADCAST */
 			csc_op = ((0 << 2) |	/* DST_DATA=RGB */
 					  (1 << 1) |	/* SRC_DATA=YCBCR*/
 					  (1 << 0));	/* CSC_10_EN */
@@ -5534,7 +5501,7 @@ int mdss_mdp_hist_collect(struct mdp_histogram_data *hist)
 	u32 exp_sum = 0;
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-	unsigned long flag;
+	unsigned long flag = 0;
 
 	if (mdata->mdp_rev < MDSS_MDP_HW_REV_103) {
 		pr_err("Unsupported mdp rev %d\n", mdata->mdp_rev);

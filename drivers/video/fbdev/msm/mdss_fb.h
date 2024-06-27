@@ -237,9 +237,6 @@ struct msm_mdp_interface {
 	void (*signal_retire_fence)(struct msm_fb_data_type *mfd,
 					int retire_cnt);
 	void *private1;
-#if defined(CONFIG_LGE_DISPLAY_COMMON)
-	void (*panel_reg_backup)(struct msm_fb_data_type *mfd);
-#endif
 };
 
 #define IS_CALIB_MODE_BL(mfd) (((mfd)->calib_mode) & MDSS_CALIB_MODE_BL)
@@ -254,6 +251,7 @@ struct msm_mdp_interface {
 				do_div(out, 2 * max_bright);\
 				} while (0)
 #endif
+
 #define MDSS_BL_TO_BRIGHT(out, v, bl_max, max_bright) do {\
 				out = (2 * ((v) * (max_bright)) + (bl_max));\
 				do_div(out, 2 * bl_max);\
@@ -328,15 +326,14 @@ struct msm_fb_data_type {
 	u32 unset_bl_level;
 	bool allow_bl_update;
 	u32 bl_level_scaled;
+#ifdef CONFIG_LGE_DISPLAY_COMMON
+	u32 br_level_val;
+#endif
 	u32 bl_level_usr;
 	struct mutex bl_lock;
 	struct mutex mdss_sysfs_lock;
 	bool ipc_resume;
 
-#if defined(CONFIG_LGE_DISPLAY_COMMON)
-	bool recovery;
-	bool need_panel_reg_backup;
-#endif
 	struct platform_device *pdev;
 
 	u32 mdp_fb_page_protection;

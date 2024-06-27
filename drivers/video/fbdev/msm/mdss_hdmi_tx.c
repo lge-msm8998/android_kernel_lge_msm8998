@@ -3527,10 +3527,6 @@ static int hdmi_tx_power_off(struct hdmi_tx_ctrl *hdmi_ctrl)
 	if (hdmi_ctrl->panel_ops.off)
 		hdmi_ctrl->panel_ops.off(pdata);
 
-	/* reset Max PCLK */
-	hdmi_edid_set_max_pclk_rate(hdmi_tx_get_fd(HDMI_TX_FEAT_EDID),
-			hdmi_ctrl->max_pclk_khz);
-
 	hdmi_tx_set_mode(hdmi_ctrl, false);
 
 	hdmi_tx_set_mode(hdmi_ctrl, true);

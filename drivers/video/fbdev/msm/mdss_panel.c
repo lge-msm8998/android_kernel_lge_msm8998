@@ -615,9 +615,7 @@ struct mdss_panel_timing *mdss_panel_get_timing_by_name(
 
 	return NULL;
 }
-#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
-void vsync_skip_set_fps(int fps);
-#endif
+
 void mdss_panel_info_from_timing(struct mdss_panel_timing *pt,
 		struct mdss_panel_info *pinfo)
 {
@@ -649,12 +647,6 @@ void mdss_panel_info_from_timing(struct mdss_panel_timing *pt,
 	pinfo->mipi.frame_rate = pt->frame_rate;
 	pinfo->edp.frame_rate = pinfo->mipi.frame_rate;
 
-#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
-	vsync_skip_set_fps(pinfo->mipi.frame_rate);
-	if (pt->frame_rate_div > 0) {
-		pinfo->mipi.frame_rate *= pt->frame_rate_div;
-	}
-#endif
 	pinfo->dsc = pt->dsc;
 	pinfo->dsc_enc_total = pt->dsc_enc_total;
 	pinfo->fbc = pt->fbc;

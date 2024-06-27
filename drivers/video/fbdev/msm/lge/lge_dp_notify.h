@@ -12,12 +12,13 @@
  *
  */
 
-#ifndef LGE_MDSS_DSISPLAY_H
-#define LGE_MDSS_DSISPLAY_H
+#ifndef LGE_DP_NOTIFY_H
+#define LGE_DP_NOTIFY_H
 
-#include "lge_mdss_aod.h"
-#include "lge_mdss_dsi.h"
-#include "lge_mdss_dsi_panel.h"
-#include "lge_mdss_fb.h"
+#include <linux/module.h>
+#include <linux/switch.h>
 
-#endif /* LGE_MDSS_DSISPLAY_H */
+void register_dp_notify_node(void);
+void set_dp_notify_node(int val);
+
+#endif /*LGE_MDSS_FB_H */

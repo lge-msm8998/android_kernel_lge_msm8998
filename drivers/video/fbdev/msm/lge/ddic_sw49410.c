@@ -3,19 +3,65 @@
 #include <linux/delay.h>
 #include "../mdss_dsi.h"
 
-enum lge_dic_mplus_mode {
-	LGE_DIC_MP_HBM = 0,
-	LGE_DIC_MP_NOR,
-	LGE_DIC_MP_PSM,
-	LGE_DIC_MP_GAL,
-	LGE_DIC_MP_MAX,
+#define NUM_SHA_CTRL 		5
+#define NUM_SC_CTRL 		4
+#define OFFSET_SC_CTRL		1
+#define NUM_SAT_CTRL 		6
+#define OFFSET_SAT_CTRL 	8
+#define NUM_HUE_CTRL 		5
+#define OFFSET_HUE_CTRL 	2
+
+#define BLMAP_HL_MODE_OFFSET 	4
+
+static char sha_ctrl_values[NUM_SHA_CTRL] = {0x00, 0x0D, 0x1A, 0x30, 0xD2};
+
+static char sc_ctrl_values[NUM_SC_CTRL] = {0x00, 0x0F, 0x08, 0x0C};
+
+static char sat_ctrl_values[NUM_SAT_CTRL][OFFSET_SAT_CTRL] = {
+	{0x00, 0x38, 0x70, 0xA8, 0xE1, 0x00, 0x00, 0x00},
+	{0x00, 0x3C, 0x78, 0xB4, 0xF1, 0x00, 0x00, 0x00},
+	{0x00, 0x40, 0x80, 0xC0, 0x00, 0x01, 0x00, 0x00},
+	{0x00, 0x43, 0x87, 0xCB, 0x00, 0x01, 0x00, 0x00},
+	{0x00, 0x47, 0x8F, 0xD7, 0x00, 0x01, 0x00, 0x00},
+	{0x00, 0x52, 0x8C, 0xD7, 0x00, 0x01, 0x90, 0x90},
 };
 
-enum lge_dic_mplus_mode_set {
-	LGE_MODE_SET_1ST = 1,
-	LGE_MODE_SET_2ND,
-	LGE_MODE_SET_3RD,
-	LGE_MODE_SET_MAX,
+static char hue_ctrl_values[NUM_HUE_CTRL][OFFSET_HUE_CTRL] = {
+	{0xF7, 0x00},
+	{0xF4, 0x00},
+	{0xF0, 0x00},
+	{0x74, 0x00},
+	{0x77, 0x00},
+};
+
+static int rgb_preset[STEP_DG_PRESET][RGB_ALL] = {
+	{PRESET_SETP2_OFFSET, PRESET_SETP0_OFFSET, PRESET_SETP2_OFFSET},
+	{PRESET_SETP2_OFFSET, PRESET_SETP1_OFFSET, PRESET_SETP2_OFFSET},
+	{PRESET_SETP0_OFFSET, PRESET_SETP0_OFFSET, PRESET_SETP0_OFFSET},
+	{PRESET_SETP0_OFFSET, PRESET_SETP1_OFFSET, PRESET_SETP0_OFFSET},
+	{PRESET_SETP0_OFFSET, PRESET_SETP2_OFFSET, PRESET_SETP0_OFFSET}
+};
+
+static int gc_preset[STEP_GC_PRESET][RGB_ALL] = {
+	{0x00, 0x00, 0x00},
+	{0x00, 0x01, 0x05},
+	{0x04, 0x01, 0x00},
+	{0x02, 0x00, 0x00},
+	{0x02, 0x00, 0x02},
+};
+
+static char dg_ctrl_values[NUM_DG_PRESET][OFFSET_DG_CTRL] = {
+	{0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40},
+	{0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F},
+	{0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E},
+	{0x3D, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D, 0x3D},
+	{0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C},
+
+	{0x3B, 0x3B, 0x3B, 0x3B, 0x3B, 0x3B, 0x3B, 0x3B},
+	{0x3A, 0x3A, 0x3A, 0x3A, 0x3A, 0x3A, 0x3A, 0x3A},
+	{0x39, 0x39, 0x39, 0x39, 0x39, 0x39, 0x39, 0x39},
+	{0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38},
+	{0x37, 0x37, 0x37, 0x37, 0x37, 0x37, 0x37, 0x37}
 };
 
 static int mplus_mode_to_dic_mp[LGE_MP_MAX][2] = {
@@ -23,8 +69,8 @@ static int mplus_mode_to_dic_mp[LGE_MP_MAX][2] = {
 	{LGE_DIC_MP_PSM, LGE_MODE_SET_1ST}, // LGE_MP_PSM
 	{LGE_DIC_MP_HBM, LGE_MODE_SET_1ST}, // LGE_MP_HBM
 	{LGE_DIC_MP_GAL, LGE_MODE_SET_1ST}, // LGE_MP_GAL
-	{LGE_DIC_MP_GAL, LGE_MODE_SET_2ND}, // LGE_MP_BRI
-	{LGE_DIC_MP_PSM, LGE_MODE_SET_1ST}, // LGE_MP_PS2
+	{LGE_DIC_MP_GAL, LGE_MODE_SET_2ND}, // LGE_MP_BRI not used
+	{LGE_DIC_MP_PSM, LGE_MODE_SET_1ST}, // LGE_MP_PS2 not used
 	{LGE_DIC_MP_GAL, LGE_MODE_SET_3RD}, // LGE_MP_HQC
 	{LGE_DIC_MP_GAL, LGE_MODE_SET_1ST}, // LGE_MP_FHB
 	{LGE_DIC_MP_NOR, LGE_MODE_SET_1ST}, // LGE_MP_OFF
@@ -38,13 +84,7 @@ enum lge_ht_tune_mode {
 	HT_TUNE_MODE_STEP_4,
 };
 
-static int blmap_changed_num_steps = 10;
-module_param(blmap_changed_num_steps, int,  S_IRUGO|S_IWUSR|S_IWGRP);
-
-static unsigned long blmap_changed_delay_us = 10*1000;
-module_param(blmap_changed_delay_us, ulong,  S_IRUGO|S_IWUSR|S_IWGRP);
-
-static bool use_u2_vs = false;
+static bool use_u2_vs = true;
 module_param(use_u2_vs, bool, S_IRUGO|S_IWUSR|S_IWGRP);
 
 #define SW49410_REG_TRIMMING 0xC7
@@ -60,25 +100,10 @@ extern int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 		enum mdss_dsi_clk_type clk_type, enum mdss_dsi_clk_state clk_state);
 extern int mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 		char cmd1, void (*fxn)(int), char *rbuf, int len);
-
-static int find_cmd_index(struct dsi_panel_cmds *pcmds, int cmd)
-{
-	int i;
-	if (pcmds == NULL)
-		return -1;
-
-	for (i = 0; i < pcmds->cmd_cnt; ++i) {
-		if (pcmds->cmds[i].payload[0] == cmd)
-			return i;
-	}
-	return -2;
-}
+extern bool check_dimming_condition(void);
 
 void identify_revision_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 {
-	if (panel_not_connected)
-		return;
-
 	if (likely(revision != REVISION_UNIDENTIFIED)) {
 		return;
 	} else {
@@ -91,126 +116,242 @@ void identify_revision_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 	}
 }
 
-static void blmap_changed_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
+static void mplus_change_blmap_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	int brightness;
-	int bl_lvl_s, bl_lvl_e;
-	int bl_lvl, bl_lvl_d;
-	unsigned long delay_us = blmap_changed_delay_us;
-	int num_steps = blmap_changed_num_steps?blmap_changed_num_steps:1;
-	int i;
-
-	if (ctrl->lge_extra.blmap == NULL || ctrl->lge_extra.blmap_size == 0) {
-		pr_err("no blmap\n");
-		return;
-	}
-
-	if (mdss_dsi_is_panel_off(&ctrl->panel_data) || mdss_dsi_is_panel_on_lp(&ctrl->panel_data)) {
-		return;
-	}
-
-	brightness = lge_mdss_fb_get_bl_brightness();
-	bl_lvl_s = ctrl->lge_extra.cur_bl_lvl * 100;
-	bl_lvl_e = lge_panel_br_to_bl(ctrl, brightness) * 100;
-	if (bl_lvl_s == bl_lvl_e) {
-		pr_info("bl_lvl not changed\n");
-		return;
-	}
-	pr_info("+ %d -> %d\n", bl_lvl_s/100, bl_lvl_e/100);
-	bl_lvl_d = (bl_lvl_e - bl_lvl_s) / num_steps;
-	bl_lvl = bl_lvl_s;
-	for (i = 1; i < num_steps; i++) {
-		bl_lvl += bl_lvl_d;
-		pr_info("%d\n", bl_lvl/100);
-		ctrl->panel_data.set_backlight(&ctrl->panel_data, bl_lvl/100);
-		usleep_range(delay_us, delay_us);
-	}
-	pr_info("%d\n", bl_lvl_e/100);
-	ctrl->panel_data.set_backlight(&ctrl->panel_data, bl_lvl_e/100);
-	pr_info("-\n");
-}
-
-static void send_mplus_mode_cmds_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int req_mp_mode)
-{
-	struct dsi_panel_cmds *pcmds;
-	int mpl_mplus_mode, mplwr_no;
-	char buf[128];
-
-	mpl_mplus_mode = mplus_mode_to_dic_mp[req_mp_mode][0];
-	mplwr_no = mplus_mode_to_dic_mp[req_mp_mode][1];
-
-	pr_info("mpl_mplus_mode = %d, mplwr_no = %d\n", mpl_mplus_mode, mplwr_no);
-
-	pcmds = lge_get_extra_cmds_by_name(ctrl, "mplus-ctrl");
-	if (pcmds) {
-		pcmds->cmds[0].payload[1] &= 0xCF;
-		pcmds->cmds[0].payload[1] |= (mpl_mplus_mode & 0x3) << 4;
-		mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
-	} else {
-		pr_err("no cmds: mplus-ctrl\n");
-	}
-	snprintf(buf, sizeof(buf), "mplus-wr-start%d", mplwr_no);
-	/*
-	 * can't re-write to mplwr(D4h) register
-	 * this issue is fixed on Rev1
-	 */
-	if (revision == 1)
-		lge_send_extra_cmds_by_name(ctrl, buf);
-}
-
-#define IE_CABC_CMD 0x55
-#define CABC_DIM_FNC_CMD 0xFC
-#define HDR_OFF 0
-#define IE_CABC_ON 0x81
-#define IE_CABC_OFF 0x00
-#define CABC_DIM_FNC_ON 0x26
-#define CABC_DIM_FNC_OFF 0x02
-#define IE_CABC 1
-#define CABC_DIM_FNC 4
-static void dic_ie_cabc_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int hdr_mode)
-{
-	struct dsi_panel_cmds *pcmds;
-
-	pcmds = lge_get_extra_cmds_by_name(ctrl, "ie-cabc-ctrl");
-	if (pcmds) {
-		int idx1, idx2;
-		idx1 = find_cmd_index(pcmds, IE_CABC_CMD);
-		idx2 = find_cmd_index(pcmds, CABC_DIM_FNC_CMD);
-		if (idx1 >= 0 && idx2 >= 0) {
-			int ie_cabc, cabc_dim_fnc;
-			if (hdr_mode == HDR_OFF) {
-				ie_cabc = IE_CABC_ON;
-				cabc_dim_fnc = CABC_DIM_FNC_ON;
-			} else {
-				ie_cabc = IE_CABC_OFF;
-				cabc_dim_fnc = CABC_DIM_FNC_OFF;
-			}
-			pcmds->cmds[idx1].payload[IE_CABC] = ie_cabc;
-			pcmds->cmds[idx2].payload[CABC_DIM_FNC] = cabc_dim_fnc;
-			pr_info("%s: send ie/cabc ctrl cmds [%d]\n", __func__, hdr_mode);
-			mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
-		}
-	} else {
-		pr_err("no cmds: cabc-ctrl\n");
-	}
-}
-
-static void dic_mplus_mode_set(struct mdss_dsi_ctrl_pdata *ctrl)
-{
-	enum lge_mplus_mode req_mp_mode;
+	int type;
+	int bl_lvl;
 
 	if (ctrl == NULL) {
 		pr_err("%pS: ctrl == NULL\n", __builtin_return_address(0));
 		return;
 	}
 
-	req_mp_mode = ctrl->lge_extra.mp_mode;
-	if (ctrl->lge_extra.mplus_hd != LGE_MP_OFF)
-		req_mp_mode = ctrl->lge_extra.mplus_hd;
-	else if (ctrl->lge_extra.hdr_mode)
-		req_mp_mode = LGE_MP_NOR;
-	else if (ctrl->lge_extra.mp_max != LGE_MP_OFF)
-		req_mp_mode = ctrl->lge_extra.mp_max;
+	if (mdss_dsi_is_panel_off(&ctrl->panel_data) || mdss_dsi_is_panel_on_lp(&ctrl->panel_data)) {
+		pr_info("unexpected panel power state while changing blmap\n");
+		return;
+	}
+
+	if(check_dimming_condition()){
+		pr_err("Skip the set backlight for LCD Dimming mode \n");
+		return;
+	}
+
+	if (ctrl->lge_extra.blmap == NULL || ctrl->lge_extra.blmap_size == 0) {
+		pr_err("no blmap\n");
+		return;
+	}
+
+	type = LGE_DDIC_OP(ctrl, get_blmap_type);
+	if (type < 0 || type >= ctrl->lge_extra.blmap_list_size)
+		type = 0;
+
+	brightness = lge_mdss_fb_get_bl_brightness();
+	if (brightness >= 0 && brightness < ctrl->lge_extra.blmap_size[type]) {
+		bl_lvl = ctrl->lge_extra.blmap[type][brightness];
+		ctrl->panel_data.set_backlight(&ctrl->panel_data, bl_lvl);
+	} else {
+		pr_err("brightness(%d) is out of range(%d), blmap type=%s\n", brightness, ctrl->lge_extra.blmap_size[type], ctrl->lge_extra.blmap_list[type]);
+	}
+}
+
+static void lge_set_rgb_tune_send_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, enum lge_gamma_correction_mode gc_mode)
+{
+	int i = 0;
+	int red_index = 0, green_index = 0, blue_index = 0, dg_status = 0;
+	int red_sum = 0, green_sum = 0, blue_sum = 0;
+	char *payload_ctrl[4] = {NULL, };
+
+	struct dsi_panel_cmds *pcmds;
+
+	if (ctrl == NULL) {
+		pr_err("Invalid input\n");
+		return;
+	}
+
+	pcmds = lge_get_extra_cmds_by_name(ctrl, "dg-dummy");
+	if (pcmds) {
+		for (i = 0; i < pcmds->cmd_cnt; i++)
+		payload_ctrl[i] = pcmds->cmds[i].payload;
+	} else {
+		pr_err("no cmds: dg-dummy\n");
+		return;
+	}
+
+	if (gc_mode == LGE_GC_MOD_NOR) {
+		if (ctrl->lge_extra.cm_red_step > DG_MODE_MAX)
+			ctrl->lge_extra.cm_red_step = DG_MODE_MAX;
+		if (ctrl->lge_extra.cm_green_step > DG_MODE_MAX)
+			ctrl->lge_extra.cm_green_step = DG_MODE_MAX;
+		if (ctrl->lge_extra.cm_blue_step > DG_MODE_MAX)
+			ctrl->lge_extra.cm_blue_step = DG_MODE_MAX;
+
+		if ((ctrl->lge_extra.cm_preset_step == RGB_DEFAULT_PRESET) &&
+			(ctrl->lge_extra.cm_red_step == RGB_DEFAULT_RED) &&
+			(ctrl->lge_extra.cm_blue_step == RGB_DEFAULT_BLUE) &&
+			(ctrl->lge_extra.cm_green_step == RGB_DEFAULT_GREEN)) {
+			dg_status = DG_OFF;
+		} else {
+			dg_status = DG_ON;
+		}
+
+		if (dg_status == DG_ON) {
+			red_index   = rgb_preset[ctrl->lge_extra.cm_preset_step][RED] + ctrl->lge_extra.cm_red_step;
+			green_index = rgb_preset[ctrl->lge_extra.cm_preset_step][GREEN] + ctrl->lge_extra.cm_green_step;
+			blue_index  = rgb_preset[ctrl->lge_extra.cm_preset_step][BLUE] + ctrl->lge_extra.cm_blue_step;
+			pr_info("red_index=(%d) green_index=(%d) blue_index=(%d)\n", red_index, green_index, blue_index);
+
+			for (i = 1; i < OFFSET_DG_CTRL+1; i++) {
+				payload_ctrl[RED][i] = dg_ctrl_values[red_index][i-1];
+				payload_ctrl[GREEN][i] = dg_ctrl_values[green_index][i-1];
+				payload_ctrl[BLUE][i] = dg_ctrl_values[blue_index][i-1];
+			}
+		}
+		payload_ctrl[RGB_ALL][1] = dg_status;
+	} else {
+		red_index   = gc_preset[gc_mode][RED];
+		green_index = gc_preset[gc_mode][GREEN];
+		blue_index  = gc_preset[gc_mode][BLUE];
+
+		for (i = 1; i < OFFSET_DG_CTRL+1; i++) {
+			payload_ctrl[RED][i] = dg_ctrl_values[red_index][i-1];
+			payload_ctrl[GREEN][i] = dg_ctrl_values[green_index][i-1];
+			payload_ctrl[BLUE][i] = dg_ctrl_values[blue_index][i-1];
+		}
+		dg_status = DG_ON;
+		payload_ctrl[RGB_ALL][1] = dg_status;
+	}
+	mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
+
+	for (i = 1; i < NUM_DG_CTRL+1; i++) {
+		red_sum += payload_ctrl[RED][i];
+		green_sum += payload_ctrl[GREEN][i];
+		blue_sum += payload_ctrl[BLUE][i];
+	}
+
+	pr_info("[0x%02x:0x%02x][0x%02x:0x%02x:%d][0x%02x:0x%02x:%d][0x%02x:0x%02x:%d]\n",
+			payload_ctrl[RGB_ALL][0], payload_ctrl[RGB_ALL][1],
+			payload_ctrl[RED][0], payload_ctrl[RED][1], red_sum,
+			payload_ctrl[GREEN][0], payload_ctrl[GREEN][1], green_sum,
+			payload_ctrl[BLUE][0], payload_ctrl[BLUE][1], blue_sum);
+
+	return;
+}
+
+static void lge_set_screen_tune_send_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int lge_screen_tune_status)
+{
+	int i = 0;
+	char *payload_ctrl[2] = {NULL, };
+	struct dsi_panel_cmds *pcmds;
+
+	pcmds = lge_get_extra_cmds_by_name(ctrl, "color-dummy");
+	if (pcmds) {
+		for (i = 0; i < pcmds->cmd_cnt; i++)
+			payload_ctrl[i] = pcmds->cmds[i].payload;
+	} else {
+		pr_err("no cmds: color-dummy\n");
+		return;
+	}
+
+	if (lge_screen_tune_status == LGE_SCREEN_TUNE_ON) {
+		if (ctrl->lge_extra.sc_sat_step > SC_MODE_MAX)
+			ctrl->lge_extra.sc_sat_step = SC_MODE_MAX;
+		if (ctrl->lge_extra.sc_hue_step > SC_MODE_MAX)
+			ctrl->lge_extra.sc_hue_step = SC_MODE_MAX;
+		if (ctrl->lge_extra.sc_sha_step > SC_MODE_MAX)
+			ctrl->lge_extra.sc_sha_step = SC_MODE_MAX;
+
+		payload_ctrl[0][1] = SHA_ON;
+		payload_ctrl[0][4] = sha_ctrl_values[ctrl->lge_extra.sc_sha_step];
+		ctrl->lge_extra.sharpness_control = true;
+
+		payload_ctrl[1][1] = sc_ctrl_values[lge_screen_tune_status];
+		for (i = 0; i < OFFSET_SAT_CTRL; i++)
+			payload_ctrl[1][i+2] = sat_ctrl_values[ctrl->lge_extra.sc_sat_step][i];
+		for (i = 0; i < OFFSET_HUE_CTRL; i++)
+			payload_ctrl[1][i+8] = hue_ctrl_values[ctrl->lge_extra.sc_hue_step][i];
+	} else {
+		if (ctrl->lge_extra.sharpness == SHA_OFF) {
+			payload_ctrl[0][1] = SHA_OFF;
+		} else {
+			payload_ctrl[0][1] = SHA_ON;
+			payload_ctrl[0][4] = ctrl->lge_extra.sharpness;
+		}
+
+		if (lge_screen_tune_status == LGE_SCREEN_TUNE_GAM) {
+			ctrl->lge_extra.sc_sat_step = LGE_SAT_GAM_MODE;
+			payload_ctrl[1][1] = sc_ctrl_values[lge_screen_tune_status];
+			for (i = 0; i < OFFSET_SAT_CTRL; i++)
+				payload_ctrl[1][i+2] = sat_ctrl_values[ctrl->lge_extra.sc_sat_step][i];
+		} else if (lge_screen_tune_status == LGE_SCREEN_TUNE_GAL) {
+			ctrl->lge_extra.sc_sat_step = LGE_SAT_GAL_MODE;
+			payload_ctrl[1][1] = sc_ctrl_values[lge_screen_tune_status];
+			for (i = 0; i < OFFSET_SAT_CTRL; i++)
+				payload_ctrl[1][i+2] = sat_ctrl_values[ctrl->lge_extra.sc_sat_step][i];
+		} else {
+			payload_ctrl[1][1] = sc_ctrl_values[lge_screen_tune_status];
+		}
+		ctrl->lge_extra.sharpness_control = false;
+	}
+	mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
+	pr_info("[0x%02x:0x%02x:0x%02x][0x%02x:0x%02x:0x%02x:0x%02x]\n",
+			payload_ctrl[0][0], payload_ctrl[0][1], payload_ctrl[0][4],
+			payload_ctrl[1][0], payload_ctrl[1][1], payload_ctrl[1][3],
+			payload_ctrl[1][8]);
+
+	return;
+}
+
+void sharpness_set_send_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	int mode = 0;
+	struct dsi_panel_cmds *pcmds;
+
+	if (ctrl->lge_extra.sharpness_control == true ) {
+		pr_info("skip sharpness control! \n");
+		return;
+	}
+
+	pcmds = lge_get_extra_cmds_by_name(ctrl, "sharpness");
+	mode = ctrl->lge_extra.sharpness;
+
+	if (pcmds) {
+		if (mode == 0) {
+			pcmds->cmds[0].payload[1] = SHA_OFF;
+		} else {
+			pcmds->cmds[0].payload[1] = SHA_ON;
+			pcmds->cmds[0].payload[4] = mode;
+		}
+		pr_info("sharpness=%d\n", mode);
+		mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
+	} else {
+		pr_err("no cmds: sharpness\n");
+	}
+}
+
+static void dic_mplus_mode_set(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
+{
+	struct dsi_panel_cmds *pcmds;
+	enum lge_mplus_mode req_mp_mode;
+	enum lge_mplus_mode old_mp_mode;
+	enum lge_gamma_correction_mode gc_mode = LGE_GC_MOD_NOR;
+	int lge_screen_tune_status = LGE_SCREEN_TUNE_OFF;
+
+	int mpl_mplus_mode, mplwr_no;
+	char buf[128];
+
+	if (ctrl == NULL) {
+		pr_err("%pS: ctrl == NULL\n", __builtin_return_address(0));
+		return;
+	}
+
+	if (mdss_dsi_is_panel_off(&ctrl->panel_data) || mdss_dsi_is_panel_on_lp(&ctrl->panel_data)) {
+		pr_info("unexpected panel power state while setting mplus mode\n");
+		return;
+	}
+
+	req_mp_mode = mode;
+	old_mp_mode = ctrl->lge_extra.cur_mp_mode;
 
 	if (req_mp_mode < 0 || req_mp_mode >= LGE_MP_MAX) {
 		pr_err("%pS: unsupproted mode:%d, mplus_hd:%d, mp_max:%d, mp_mode:%d\n", __builtin_return_address(0),
@@ -218,23 +359,115 @@ static void dic_mplus_mode_set(struct mdss_dsi_ctrl_pdata *ctrl)
 		req_mp_mode = LGE_MP_NOR;
 	}
 
-	pr_info("%pS: mplus mode: %d\n", __builtin_return_address(0), req_mp_mode);
+	pr_info("%pS: req mplus mode: %d\n", __builtin_return_address(0), req_mp_mode);
+
+	mpl_mplus_mode = mplus_mode_to_dic_mp[req_mp_mode][0];
+	mplwr_no = mplus_mode_to_dic_mp[req_mp_mode][1];
+
+	switch (ctrl->lge_extra.screen_mode) {
+	case LGE_COLOR_CIN:
+		gc_mode = LGE_GC_MOD_CIN;
+		break;
+	case LGE_COLOR_SPO:
+		gc_mode = LGE_GC_MOD_SPO;
+		break;
+	case LGE_COLOR_GAM:
+		gc_mode = LGE_GC_MOD_GAM;
+		lge_screen_tune_status = LGE_SCREEN_TUNE_GAM;
+		break;
+	case LGE_COLOR_MAN:
+		lge_screen_tune_status = LGE_SCREEN_TUNE_ON;
+		if(ctrl->lge_extra.color_filter)
+		    gc_mode = LGE_GC_MOD_HQC;
+		break;
+	case LGE_COLOR_OPT:
+	default:
+		break;
+    }
+	if ((ctrl->lge_extra.mp_mode == LGE_MP_GAL) &&
+			(lge_screen_tune_status == LGE_SCREEN_TUNE_OFF)) {
+		lge_screen_tune_status = LGE_SCREEN_TUNE_GAL;
+	}
+	pr_info("gc_mode = %d, lge_screen_tune_status = %d\n", gc_mode, lge_screen_tune_status);
+
+	pcmds = lge_get_extra_cmds_by_name(ctrl, "mplus-ctrl");
+	if (pcmds) {
+		pcmds->cmds[0].payload[1] &= 0xCF;
+		pcmds->cmds[0].payload[1] |= (mpl_mplus_mode & 0x3) << 4;
+		mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
+		pr_info("mpl_mplus_mode = %d, mplwr_no = %d mp mode : %x\n", mpl_mplus_mode, mplwr_no, pcmds->cmds[0].payload[1]);
+	} else {
+		pr_err("no cmds: mplus-ctrl\n");
+	}
+	snprintf(buf, sizeof(buf), "mplus-wr-start%d", mplwr_no);
+
+	/*
+	 * can't re-write to mplwr(D4h) register
+	 * this issue is fixed on Rev1
+	 */
+	if (revision == 1)
+		lge_send_extra_cmds_by_name(ctrl, buf);
+
+	lge_set_rgb_tune_send_sw49410(ctrl, gc_mode);
+	lge_set_screen_tune_send_sw49410(ctrl, lge_screen_tune_status);
+	sharpness_set_send_sw49410(ctrl);
+
+	if ((old_mp_mode == LGE_MP_HBM) || (req_mp_mode == LGE_MP_HBM) ||
+		(old_mp_mode == LGE_MP_FHB) || (req_mp_mode == LGE_MP_FHB)) {
+		pr_debug("skip brightness dimming\n");
+	} else {
+		pr_debug("brightness dimming\n");
+		// TBD
+	}
 
 	ctrl->lge_extra.cur_mp_mode = req_mp_mode;
 
-	if (mdss_dsi_is_panel_off(&ctrl->panel_data) || mdss_dsi_is_panel_on_lp(&ctrl->panel_data)) {
-		return;
-	}
+	pr_info("[mp_hd:%d][hdr:%d][hl:%d][max:%d][mp_adv:%d][mp:%d][gc:%d][sc_tun:%d][shap:%d]\n",
+			ctrl->lge_extra.mplus_hd, ctrl->lge_extra.hdr_mode, ctrl->lge_extra.hl_mode,
+			ctrl->lge_extra.mp_max, ctrl->lge_extra.adv_mp_mode, ctrl->lge_extra.mp_mode,
+			gc_mode, lge_screen_tune_status, ctrl->lge_extra.sharpness);
+}
 
-	LGE_DDIC_OP(ctrl, send_mplus_mode_cmds, ctrl->lge_extra.cur_mp_mode);
+static void mplus_mode_set_sub_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	if (ctrl->lge_extra.mplus_hd != LGE_MP_OFF)
+		dic_mplus_mode_set(ctrl, ctrl->lge_extra.mplus_hd);
+	else if (ctrl->lge_extra.hdr_mode)
+		dic_mplus_mode_set(ctrl, LGE_MP_NOR);
+	else if (ctrl->lge_extra.hl_mode)
+		dic_mplus_mode_set(ctrl, LGE_MP_HBM);
+	else if (ctrl->lge_extra.mp_max != LGE_MP_OFF)
+		dic_mplus_mode_set(ctrl, LGE_MP_FHB);
+	else if (ctrl->lge_extra.adv_mp_mode != LGE_MP_OFF)
+		dic_mplus_mode_set(ctrl, ctrl->lge_extra.adv_mp_mode);
+	else
+		dic_mplus_mode_set(ctrl, ctrl->lge_extra.mp_mode);
+}
+
+static int image_enhance_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+	ctrl->lge_extra.mp_mode = mode;
+	pr_info("mp_mode : %d\n", mode);
+	mplus_mode_set_sub_sw49410(ctrl);
+	return 0;
+}
+
+static int image_enhance_get_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+	return ctrl->lge_extra.mp_mode;
 }
 
 static int mplus_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
 {
 	if (ctrl == NULL)
 		return -ENODEV;
-	ctrl->lge_extra.mp_mode = mode;
-	dic_mplus_mode_set(ctrl);
+	ctrl->lge_extra.adv_mp_mode = mode;
+	pr_info("adv_mp_mode : %d\n", mode);
+	mplus_mode_set_sub_sw49410(ctrl);
 	return 0;
 }
 
@@ -242,7 +475,7 @@ static int mplus_mode_get_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	if (ctrl == NULL)
 		return -ENODEV;
-	return ctrl->lge_extra.mp_mode;
+	return ctrl->lge_extra.adv_mp_mode;
 }
 
 static int mplus_hd_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
@@ -250,7 +483,8 @@ static int mplus_hd_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
 	if (ctrl == NULL)
 		return -ENODEV;
 	ctrl->lge_extra.mplus_hd = mode;
-	dic_mplus_mode_set(ctrl);
+	pr_info("mplus_hd : %d\n", mode);
+	mplus_mode_set_sub_sw49410(ctrl);
 	return 0;
 }
 
@@ -266,7 +500,8 @@ static int mplus_max_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
 	if (ctrl == NULL)
 		return -ENODEV;
 	ctrl->lge_extra.mp_max = mode;
-	dic_mplus_mode_set(ctrl);
+	pr_info("mp_max : %d\n", mode);
+	mplus_mode_set_sub_sw49410(ctrl);
 	return 0;
 }
 
@@ -277,23 +512,6 @@ static int mplus_max_get_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 	return ctrl->lge_extra.mp_max;
 }
 
-static int hdr_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
-{
-	if (ctrl == NULL)
-		return -ENODEV;
-	ctrl->lge_extra.hdr_mode = mode;
-	dic_ie_cabc_ctrl(ctrl, mode);
-	dic_mplus_mode_set(ctrl);
-	return 0;
-}
-
-static int hdr_mode_get_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
-{
-	if (ctrl == NULL)
-		return -ENODEV;
-	return ctrl->lge_extra.hdr_mode;
-}
-
 static int get_blmap_type_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	int mode;
@@ -302,16 +520,154 @@ static int get_blmap_type_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 		return 0;
 
 	if (ctrl->lge_extra.use_mplus) {
-		mode = ctrl->lge_extra.cur_mp_mode;
+		if (ctrl->lge_extra.mplus_hd != LGE_MP_OFF)
+			mode = ctrl->lge_extra.mplus_hd;
+		else if (ctrl->lge_extra.mp_max != LGE_MP_OFF)
+			mode = LGE_MP_FHB;
+		else if (ctrl->lge_extra.hdr_mode)
+			mode = LGE_MP_NOR;
+		else if (ctrl->lge_extra.adv_mp_mode != LGE_MP_OFF)
+			mode = ctrl->lge_extra.adv_mp_mode;
+		else
+			mode = ctrl->lge_extra.mp_mode;
+
 		if (ctrl->lge_extra.mp_to_blmap_tbl_size > 0 && mode >= ctrl->lge_extra.mp_to_blmap_tbl_size) {
 			pr_err("no blmap for mplus mode %d\n", mode);
 			mode = LGE_MP_NOR;
 		}
 		type = ctrl->lge_extra.mp_to_blmap_tbl[mode];
-		pr_info("mp_mode=%d type=%d\n", mode, type);
+
+		if (ctrl->lge_extra.hl_mode == 1 && ctrl->lge_extra.mplus_hd == LGE_MP_OFF && type < BLMAP_HL_MODE_OFFSET) {
+			pr_info("adding hl mode offset to blmap type\n");
+			type += BLMAP_HL_MODE_OFFSET;
+		}
+		pr_debug("searching mp mode=%d, type=%d\n", mode, type);
 	}
 
 	return type;
+}
+
+static int screen_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+
+	ctrl->lge_extra.screen_mode = mode;
+	switch (ctrl->lge_extra.screen_mode) {
+	case LGE_COLOR_ECO:
+	case LGE_COLOR_GAM:
+		ctrl->lge_extra.adv_mp_mode = LGE_MP_PSM;
+		break;
+	case LGE_COLOR_CIN:
+	case LGE_COLOR_SPO:
+		ctrl->lge_extra.adv_mp_mode = LGE_MP_NOR;
+		break;
+	case LGE_COLOR_MAN:
+		if (ctrl->lge_extra.color_filter)
+			ctrl->lge_extra.adv_mp_mode = LGE_MP_HQC;
+		else
+			ctrl->lge_extra.adv_mp_mode = LGE_MP_NOR;
+		break;
+	case LGE_COLOR_OPT:
+	case LGE_COLOR_MAX:
+	default:
+		ctrl->lge_extra.adv_mp_mode = LGE_MP_OFF;
+		break;
+	}
+
+	pr_info("screen_mode : %d, adv_mp_mode : %d\n", ctrl->lge_extra.screen_mode, ctrl->lge_extra.adv_mp_mode);
+
+	mplus_mode_set_sub_sw49410(ctrl);
+
+	return 0;
+}
+
+static int rgb_tune_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+
+	if (ctrl->lge_extra.cm_preset_step > 4)
+        ctrl->lge_extra.cm_preset_step = 4;
+
+	pr_info("preset : %d , red = %d , green = %d , blue = %d \n",
+            ctrl->lge_extra.cm_preset_step, ctrl->lge_extra.cm_red_step,
+            ctrl->lge_extra.cm_green_step, ctrl->lge_extra.cm_blue_step);
+
+	mplus_mode_set_sub_sw49410(ctrl);
+	return 0;
+}
+
+static int screen_tune_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+
+	pr_info("sat : %d , hue = %d , sha = %d , CF = %d \n",
+			ctrl->lge_extra.sc_sat_step, ctrl->lge_extra.sc_hue_step,
+			ctrl->lge_extra.sc_sha_step, ctrl->lge_extra.color_filter);
+
+	screen_mode_set_sw49410(ctrl, ctrl->lge_extra.screen_mode);
+	return 0;
+}
+
+static int sharpness_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+	ctrl->lge_extra.sharpness = mode;
+	sharpness_set_send_sw49410(ctrl);
+	return 0;
+}
+
+static int hdr_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
+{
+	struct dsi_panel_cmds *pcmds;
+
+	if (ctrl == NULL)
+		return -ENODEV;
+
+	pcmds = lge_get_extra_cmds_by_name(ctrl, "ie-ctrl");
+	if (pcmds) {
+		if (mode == 0) {
+			pcmds->cmds[0].payload[1] = 0x81; /* IE on */
+			pcmds->cmds[1].payload[4] = 0x26; /* CABC on */
+		} else {
+			pcmds->cmds[0].payload[1] = 0x00; /* IE off */
+			pcmds->cmds[1].payload[4] = 0x02; /* CABC off */
+		}
+		pr_info("hdr_mode=%d\n", mode);
+		ctrl->lge_extra.hdr_mode = mode;
+		mdss_dsi_panel_cmds_send(ctrl, pcmds, CMD_REQ_COMMIT);
+	} else {
+		pr_err("no cmds: ie-ctrl\n");
+	}
+	mplus_mode_set_sub_sw49410(ctrl);
+
+	return 0;
+}
+
+static int hl_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
+{
+	if (ctrl == NULL)
+		return -ENODEV;
+	ctrl->lge_extra.hl_mode = mode;
+	mplus_mode_set_sub_sw49410(ctrl);
+
+	return 0;
+}
+
+static int find_cmd_index(struct dsi_panel_cmds *pcmds, int cmd)
+{
+	int i;
+	if (pcmds == NULL)
+		return -1;
+
+	for (i = 0; i < pcmds->cmd_cnt; ++i) {
+		if (pcmds->cmds[i].payload[0] == cmd)
+			return i;
+	}
+	return -2;
 }
 
 #define PARTIAL_AREA_CMD 0x30
@@ -336,19 +692,15 @@ static int send_u2_cmds_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 		int partial_area_cmd_idx = find_cmd_index(pcmds, PARTIAL_AREA_CMD);
 		int u2_ctrl_cmd_idx = find_cmd_index(pcmds, U2_CTRL_CMD);
 		if (partial_area_cmd_idx >= 0 && u2_ctrl_cmd_idx >= 0) {
-			struct lge_rect aod_area = {0, 0, 0, 0};
-			if (!ctrl->lge_extra.aod_area_full) {
-				aod_area = ctrl->lge_extra.aod_area;
-			}
-			h = aod_area.h;
+			h = ctrl->lge_extra.aod_area.h;
 			h = h?h:ctrl->panel_data.panel_info.yres;
 			if (use_u2_vs) {
 				sr = 0;
 				er = h - 1;
-				vsub = aod_area.y;
+				vsub = ctrl->lge_extra.aod_area.y;
 			} else {
-				sr = aod_area.y;
-				er = aod_area.y + h - 1;
+				sr = ctrl->lge_extra.aod_area.y;
+				er = ctrl->lge_extra.aod_area.y + h - 1;
 				vsub = 0;
 			}
 			pr_info("SR=%d, ER=%d, VSUB=%d\n", sr, er, vsub);
@@ -370,27 +722,14 @@ static int send_u2_cmds_sw49410(struct mdss_dsi_ctrl_pdata *ctrl)
 	return 0;
 }
 
-static int boost_brightness_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int value)
-{
-	pr_info("%d +\n", value);
-	if (value >= ctrl->lge_extra.boost_br_criteria && LGE_DDIC_OP(ctrl, mplus_max_get) == LGE_MP_OFF) {
-		LGE_DDIC_OP(ctrl, mplus_max_set, LGE_MP_FHB);
-	} else if (value < ctrl->lge_extra.boost_br_criteria && LGE_DDIC_OP(ctrl, mplus_max_get) != LGE_MP_OFF) {
-		LGE_DDIC_OP(ctrl, mplus_max_set, LGE_MP_OFF);
-	}
-	pr_info("%d -\n", value);
-
-	return 0;
-}
-
 static void ht_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
 {
 	if (mdss_dsi_is_panel_off(&ctrl->panel_data)) {
-		pr_info("Panel power is off skip cmd %d\n",mode);
+		pr_info("Panel power is off skip cmd %d\n", mode);
 		return;
 	}
 
-	switch(mode) {
+	switch (mode) {
 		case HT_TUNE_MODE_STEP_0:
 			pr_info("HT Tune Mode Step 0\n");
 			lge_send_extra_cmds_by_name(ctrl, "ht-tune-0");
@@ -414,26 +753,16 @@ static void ht_mode_set_sw49410(struct mdss_dsi_ctrl_pdata *ctrl, int mode)
 		default:
 			pr_info("HT Tune Mode unmatched\n");
 			break;
-
 	}
 	return;
 }
 
 static struct lge_ddic_ops sw49410_ops = {
 	.op_get_blmap_type = get_blmap_type_sw49410,
-	.op_blmap_changed = blmap_changed_sw49410,
+	.op_mplus_change_blmap = mplus_change_blmap_sw49410,
 
-	.op_boost_brightness = boost_brightness_sw49410,
-
-	.op_image_enhance_set = mplus_mode_set_sw49410,
-	.op_image_enhance_get = mplus_mode_get_sw49410,
-
-	.op_hdr_mode_set = hdr_mode_set_sw49410,
-	.op_hdr_mode_get = hdr_mode_get_sw49410,
-
-	.op_send_u2_cmds = send_u2_cmds_sw49410,
-
-	.op_send_mplus_mode_cmds = send_mplus_mode_cmds_sw49410,
+	.op_image_enhance_set = image_enhance_set_sw49410,
+	.op_image_enhance_get = image_enhance_get_sw49410,
 	.op_mplus_mode_set = mplus_mode_set_sw49410,
 	.op_mplus_mode_get = mplus_mode_get_sw49410,
 	.op_mplus_hd_set = mplus_hd_set_sw49410,
@@ -441,7 +770,17 @@ static struct lge_ddic_ops sw49410_ops = {
 	.op_mplus_max_set = mplus_max_set_sw49410,
 	.op_mplus_max_get = mplus_max_get_sw49410,
 
+	.op_screen_mode_set = screen_mode_set_sw49410,
+	.op_rgb_tune_set = rgb_tune_set_sw49410,
+	.op_screen_tune_set  = screen_tune_set_sw49410,
+	.op_sharpness_set  = sharpness_set_sw49410,
+	.op_hdr_mode_set  = hdr_mode_set_sw49410,
+	.op_hl_mode_set  = hl_mode_set_sw49410,
+
+	.op_send_u2_cmds = send_u2_cmds_sw49410,
+
 	.op_ht_mode_set = ht_mode_set_sw49410,
+
 };
 
 struct lge_ddic_ops *get_ddic_ops_sw49410(void)

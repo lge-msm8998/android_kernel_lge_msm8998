@@ -579,6 +579,7 @@ struct mdss_dsi_ctrl_pdata {
 	struct mdss_dsi_debugfs_info *debugfs_info;
 
 	struct dsi_err_container err_cont;
+
 	struct kobject *kobj;
 	int fb_node;
 
@@ -593,6 +594,9 @@ struct mdss_dsi_ctrl_pdata {
 	bool update_phy_timing; /* flag to recalculate PHY timings */
 
 	bool phy_power_off;
+#ifdef CONFIG_PXLW_IRIS3_BRIDGE_IC
+	int iris_rst_gpio;
+#endif
 
 #if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
 	struct lge_mdss_dsi_ctrl_pdata lge_extra;

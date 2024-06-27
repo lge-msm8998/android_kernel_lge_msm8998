@@ -14,12 +14,11 @@
 
 #ifndef LGE_MDSS_DSI_H
 #define LGE_MDSS_DSI_H
-#include "../mdss_dsi.h"
-#include <linux/interrupt.h>
-#include <linux/irq.h>
-#include "mplus/lge_mplus.h"
+#include "lge_mplus.h"
+#include "lge_color_manager.h"
 
-#define NUM_COLOR_MODES 	10
+#define DEFAULT_LGE_FSC_U3 20000
+#define DEFAULT_LGE_FSC_U2 2500
 
 struct lge_gpio_entry {
 	char name[32];
@@ -34,30 +33,29 @@ struct lge_dsi_cmds_entry {
 struct lge_ddic_ops {
 	/* blmap */
 	int (*op_get_blmap_type)(struct mdss_dsi_ctrl_pdata *ctrl);
-	void (*op_blmap_changed)(struct mdss_dsi_ctrl_pdata *ctrl);
+	void (*op_mplus_change_blmap)(struct mdss_dsi_ctrl_pdata *ctrl);
 
-	/* boost brightness */
-	int (*op_boost_brightness)(struct mdss_dsi_ctrl_pdata *ctrl, int value);
-
-	/* image_enhance */
+	/* image enhance mode */
 	int (*op_image_enhance_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
 	int (*op_image_enhance_get)(struct mdss_dsi_ctrl_pdata *ctrl);
 
-	/* hdr_mode */
-	int (*op_hdr_mode_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
-	int (*op_hdr_mode_get)(struct mdss_dsi_ctrl_pdata *ctrl);
-
-	/* aod */
-	int (*op_send_u2_cmds)(struct mdss_dsi_ctrl_pdata *ctrl);
-
 	/* MPLUS */
-	void (*op_send_mplus_mode_cmds)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
 	int (*op_mplus_mode_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
 	int (*op_mplus_mode_get)(struct mdss_dsi_ctrl_pdata *ctrl);
 	int (*op_mplus_hd_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
 	int (*op_mplus_hd_get)(struct mdss_dsi_ctrl_pdata *ctrl);
 	int (*op_mplus_max_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
 	int (*op_mplus_max_get)(struct mdss_dsi_ctrl_pdata *ctrl);
+	/* advanced IE */
+	int (*op_screen_mode_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
+	int (*op_rgb_tune_set)(struct mdss_dsi_ctrl_pdata *ctrl);
+	int (*op_screen_tune_set)(struct mdss_dsi_ctrl_pdata *ctrl);
+	int (*op_sharpness_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
+	int (*op_hdr_mode_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
+	int (*op_hl_mode_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
+
+	/* aod */
+	int (*op_send_u2_cmds)(struct mdss_dsi_ctrl_pdata *ctrl);
 
 	/* ht_tune */
 	void (*op_ht_mode_set)(struct mdss_dsi_ctrl_pdata *ctrl, int mode);
@@ -71,14 +69,15 @@ struct lge_rect {
 };
 
 struct lge_mdss_dsi_ctrl_pdata {
-	/* multi panel support */
-	int panel_id;
+	/* use full scale current support */
+	bool use_u2_fsc;
+	int fsc_old;
+	int fsc_req;
+	int fsc_u3;
+	int fsc_u2;
 
 	/* blank mode support */
 	int blank_mode;
-
-	/* panel type for minios */
-	char panel_type[MDSS_MAX_PANEL_LEN];
 
 	/* gpio */
 	int num_gpios;
@@ -89,33 +88,50 @@ struct lge_mdss_dsi_ctrl_pdata {
 	int blmap_list_size;
 	int **blmap;
 	int *blmap_size;
-	int cur_bl_lvl;
 
 	/* cmds */
 	int num_extra_cmds;
 	struct lge_dsi_cmds_entry *extra_cmds_array;
 
-	/* boost brightness */
-	int boost_br_criteria;
-
-	/* hdr */
-	int hdr_mode;
-
 	/* mplus */
 	bool use_mplus;
+	int mplus_dim_cnt;
+	int mplus_dim_delay;
 	enum lge_mplus_mode mplus_hd;
 	enum lge_mplus_mode mp_max;
 	enum lge_mplus_mode mp_mode;
+	enum lge_mplus_mode adv_mp_mode;
 	enum lge_mplus_mode cur_mp_mode;
 	int *mp_to_blmap_tbl;
 	int mp_to_blmap_tbl_size;
 
+	/* advanced IE */
+	int sharpness;
+	bool sharpness_control;
+	int hdr_mode;
+	int hl_mode;
+	int screen_mode;
+	int screen_tune_status;
+	int sc_sat_step;
+	int sc_hue_step;
+	int sc_sha_step;
+	int color_filter;
+
+	/* For DISPLAY_COLOR_MANAGER */
+	int cm_preset_step;
+	int cm_red_step;
+	int cm_green_step;
+	int cm_blue_step;
+
 	/* aod */
-	bool aod_area_full;
 	struct lge_rect aod_area;
+	u32 aod_interface;
 
 	/* ddic ops */
 	struct lge_ddic_ops *ddic_ops;
+
+	/* esc_clk_rate */
+	int esc_clk_rate;
 };
 
 #define LGE_DDIC_OP_CHECK(c, op) (c && c->lge_extra.ddic_ops && c->lge_extra.ddic_ops->op_##op)
@@ -136,8 +152,8 @@ int lge_mdss_dsi_parse_extra_params(
 void lge_extra_gpio_set_value(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		const char *name, int value);
 
-int detect_factory_cable(void);
-int detect_qem_factory_cable(void);
+int lge_panel_power_on(struct mdss_panel_data *pdata);
+int lge_panel_power_off(struct mdss_panel_data *pdata);
 
 #if IS_ENABLED(CONFIG_LGE_DISPLAY_OVERRIDE_MDSS_DSI_CTRL_SHUTDOWN)
 void mdss_dsi_ctrl_shutdown(struct platform_device *pdev);

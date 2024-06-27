@@ -23,7 +23,7 @@
 
 #define GO_ON_NOPANEL_BIT	((BIT(INIT))|(BIT(ENABLE)))
 #define GO_ON_BIT		((GO_ON_NOPANEL_BIT)|BIT(PANEL))
-#define IDLE_INTERVAL		(33000)
+#define IDLE_INTERVAL		(MAX_INTERVAL)
 
 enum status {
 	INIT,
@@ -87,7 +87,7 @@ static int __lge_interval_thread(void *data)
 	timeout = usecs_to_jiffies(IDLE_INTERVAL);
 	while (1) {
 		ret = wait_event_interruptible_timeout(imon.interval_wait_q,
-			atomic_read(&imon.interval_pending) ||
+			atomic_read(&imon.interval_pending) > 0 ||
 			kthread_should_stop(), timeout);
 
 		if (kthread_should_stop())
@@ -102,7 +102,7 @@ static int __lge_interval_thread(void *data)
 		}
 		lge_interval_notifier_call_chain(INTERVAL_EVENT_NOTIFY,
 						 &imon.interval);
-		atomic_dec(&imon.interval_pending);
+		atomic_dec_if_positive(&imon.interval_pending);
 		if (!CHECK_BIT(imon.status_bits, BIT(PANEL)))
 			break;
 	}
@@ -302,6 +302,9 @@ static int lge_interval_display_info_init(void)
 	if (!dinfo.init) {
 		dinfo.fbi_list =
 			(struct fb_info **)kallsyms_lookup_name("fbi_list");
+		if (dinfo.fbi_list == NULL)
+			return -EFAULT;
+
 		if (dinfo.fbi_list[0] == NULL)
 			return -EFAULT;
 

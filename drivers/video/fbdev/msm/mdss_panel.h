@@ -64,9 +64,20 @@ struct panel_id {
 enum lge_bl_map_type {
 	LGE_BLDFT = 0,		/* default */
 	LGE_BL = LGE_BLDFT,	/* main backlight */
+	LGE_BLHL,		/* main backlight with high luminance */
+	LGE_BL2,		/* second backlight */
+	LGE_BL2DIM,		/* second backlight with dimming */
+	LGE_BL2HL,		/* second backlight with high luminance */
+	LGE_BL2DIMHL,		/* second backlight with dimming and high luminance */
 	LGE_BLMAPMAX
 };
+
+enum lcd_panel_type {
+	AUO_HX8279D_1200_1920_VIDEO_PANEL,
+	UNKNOWN_PANEL
+};
 #endif
+
 #define DSC_PPS_LEN		128
 #define INTF_EVENT_STR(x)	#x
 
@@ -319,9 +330,6 @@ enum mdss_intf_events {
 	MDSS_EVENT_DSI_TIMING_DB_CTRL,
 	MDSS_EVENT_AVR_MODE,
 	MDSS_EVENT_REGISTER_CLAMP_HANDLER,
-#if defined(CONFIG_LGE_DISPLAY_COMMON)
-	MDSS_EVENT_PANEL_REG_BACKUP,
-#endif
 	MDSS_EVENT_DSI_DYNAMIC_BITCLK,
 	MDSS_EVENT_UPDATE_LIVEDISPLAY,
 	MDSS_EVENT_MAX,
@@ -815,6 +823,10 @@ struct mdss_panel_info {
 	u32 out_format;
 	u32 rst_seq[MDSS_DSI_RST_SEQ_LEN];
 	u32 rst_seq_len;
+#ifdef CONFIG_PXLW_IRIS3_BRIDGE_IC /* Modified reset sequence liyan 20190520 */
+	u32 iris_rst_seq[MDSS_DSI_RST_SEQ_LEN];
+	u32 iris_rst_seq_len;
+#endif
 	u32 vic; /* video identification code */
 	u32 deep_color;
 	bool is_ce_mode; /* CE video format */
@@ -824,6 +836,13 @@ struct mdss_panel_info {
 	int pwm_pmic_gpio;
 	int pwm_lpg_chan;
 	int pwm_period;
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	u32 default_brightness;
+	int panel_type;
+	int blmap_size;
+	int *blmap[LGE_BLMAPMAX];
+#endif
+
 	bool dynamic_fps;
 	bool dynamic_bitclk;
 	u32 *supp_bitclks;
@@ -982,9 +1001,7 @@ struct mdss_panel_timing {
 
 	u64 clk_rate;
 	char frame_rate;
-#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
-	char frame_rate_div;
-#endif
+
 	u8 dsc_enc_total;
 	struct dsc_desc dsc;
 	struct fbc_panel_info fbc;
