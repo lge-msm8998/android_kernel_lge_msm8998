@@ -489,6 +489,62 @@
 	};
 };
 
+&reserved_memory {
+	/delete-node/ pil_ipa_gpu_region;
+	/delete-node/ pil_slpi_region;
+	/delete-node/ pil_mba_region;
+	/delete-node/ pil_video_region;
+	/delete-node/ modem_region;
+	/delete-node/ pil_adsp_region;
+	/delete-node/ spss_region;
+
+	pil_ipa_gpu_region@95F00000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x95F00000 0 0x100000>;
+	};
+
+	pil_slpi_region@95000000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x95000000 0 0xf00000>;
+	};
+
+	pil_mba_region@94E00000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x94E00000 0 0x200000>;
+	};
+
+	pil_video_region@94900000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x94900000 0 0x500000>;
+	};
+
+	modem_region@8b400000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x8b400000 0 0x7700000>;
+	};
+
+	pil_adsp_region@0x92B00000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x92B00000 0 0x1e00000>;
+	};
+
+	spss_region@8ab00000 { /* for SPSS-PIL */
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0x8ab00000 0 0x600000>;
+	};
+};
+
+&qseecom_mem {
+       size = <0 0x1800000>;
+};
+
 &spmi_bus {
 	qcom,pmi8998@3 {
 		qcom,leds@d000 {
