@@ -119,6 +119,11 @@ static inline bool qpnp_pon_check_hard_reset_stored(void)
 #ifdef CONFIG_LGE_PM
 static inline int qpnp_pon_is_off_reason(void) { return -ENODEV; }
 #endif
+
+#ifdef CONFIG_LGE_DISPLAY_LABIBB_RECOVERY
+extern void do_msm_hard_reset(void);
+#endif
+
 #endif
 
 #endif

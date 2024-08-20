@@ -294,3 +294,9 @@ config LGE_FBCN
 	bool "Frame Based Clock Normalizer"
 	---help---
 	This feature provides Frame Based Clock Normalizer scheme.
+
+config LGE_DISPLAY_LABIBB_RECOVERY
+	bool "Recover labibb by reboot system"
+	default n
+	---help---
+	Recovery labibb by reboot system
