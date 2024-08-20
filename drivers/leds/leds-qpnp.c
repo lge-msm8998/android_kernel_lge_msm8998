@@ -575,6 +575,11 @@ static u32 kpdbl_master_period_us;
 DECLARE_BITMAP(kpdbl_leds_in_use, NUM_KPDBL_LEDS);
 static bool is_kpdbl_master_turn_on;
 
+#ifdef CONFIG_LEDS_LGE_EMOTIONAL
+static int qpnp_pattern_solid(struct qpnp_led_data *led);
+static void qpnp_pattern_config(struct qpnp_led_data *led);
+#endif
+
 static int
 qpnp_led_masked_write(struct qpnp_led_data *led, u16 addr, u8 mask, u8 val)
 {
@@ -1723,6 +1728,9 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 {
 	int rc;
 	int duty_us, duty_ns, period_us;
+#ifdef CONFIG_LEDS_LGE_EMOTIONAL
+	struct pwm_device *pwm;
+#endif
 
 	if (led->cdev.brightness) {
 		if (!led->rgb_cfg->pwm_cfg->blinking)
@@ -1768,14 +1776,24 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 			return rc;
 		}
 		if (!led->rgb_cfg->pwm_cfg->pwm_enabled) {
+#ifdef CONFIG_LEDS_LGE_EMOTIONAL
+			pwm = led->rgb_cfg->pwm_cfg->pwm_dev;
+			rc = pwm->chip->ops->enable(pwm->chip, pwm);
+#else
 			pwm_enable(led->rgb_cfg->pwm_cfg->pwm_dev);
+#endif
 			led->rgb_cfg->pwm_cfg->pwm_enabled = 1;
 		}
 	} else {
 		led->rgb_cfg->pwm_cfg->mode =
 			led->rgb_cfg->pwm_cfg->default_mode;
 		if (led->rgb_cfg->pwm_cfg->pwm_enabled) {
+#ifdef CONFIG_LEDS_LGE_EMOTIONAL
+			pwm = led->rgb_cfg->pwm_cfg->pwm_dev;
+			pwm->chip->ops->disable(pwm->chip, pwm);
+#else
 			pwm_disable(led->rgb_cfg->pwm_cfg->pwm_dev);
+#endif
 			led->rgb_cfg->pwm_cfg->pwm_enabled = 0;
 		}
 		rc = qpnp_led_masked_write(led,
@@ -1842,7 +1860,11 @@ static void __qpnp_led_work(struct qpnp_led_data *led,
 	case QPNP_ID_RGB_RED:
 	case QPNP_ID_RGB_GREEN:
 	case QPNP_ID_RGB_BLUE:
+#ifdef CONFIG_LEDS_LGE_EMOTIONAL
+		rc = qpnp_pattern_solid(led);
+#else
 		rc = qpnp_rgb_set(led);
+#endif
 		if (rc < 0)
 			dev_err(&led->pdev->dev,
 				"RGB set brightness failed (%d)\n", rc);
@@ -3835,6 +3857,10 @@ static int qpnp_get_config_rgb(struct qpnp_led_data *led,
 			pwm_put(led->rgb_cfg->pwm_cfg->pwm_dev);
 		return rc;
 	}
+
+#ifdef CONFIG_LEDS_LGE_EMOTIONAL
+	qpnp_pattern_config(led);
+#endif
 
 	return 0;
 }
