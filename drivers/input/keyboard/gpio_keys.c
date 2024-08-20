@@ -235,6 +235,22 @@ static ssize_t gpio_keys_attr_show_helper(struct gpio_keys_drvdata *ddata,
 	return ret;
 }
 
+#if defined(CONFIG_LGE_HALL_IC)
+#if defined(CONFIG_MACH_MSM8996_ELSA) || defined(CONFIG_MACH_MSM8996_ANNA)
+static ssize_t virtual_hallic_state_show(struct device *dev, struct device_attribute *attr, char *buf){
+  return sprintf(buf, "%d\n", hallic_sdev.state);
+}
+static ssize_t virtual_hallic_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+
+  unsigned long val = simple_strtoul(buf, NULL, 10);
+
+  switch_set_state(&hallic_sdev, val);
+  pr_err("hall_ic state switched to %ld \n", val);
+  return count;
+}
+#endif
+#endif
+
 /**
  * gpio_keys_attr_store_helper() - enable/disable buttons based on given bitmap
  * @ddata: pointer to drvdata
@@ -361,11 +377,24 @@ static DEVICE_ATTR(disabled_switches, S_IWUSR | S_IRUGO,
 		   gpio_keys_show_disabled_switches,
 		   gpio_keys_store_disabled_switches);
 
+#if defined(CONFIG_LGE_HALL_IC)
+#if defined(CONFIG_MACH_MSM8996_ELSA) || defined(CONFIG_MACH_MSM8996_ANNA)
+static DEVICE_ATTR(virtual_hallic_state, S_IRUGO | S_IWUSR | S_IWGRP,
+       virtual_hallic_state_show,
+       virtual_hallic_state_store);
+#endif
+#endif
+
 static struct attribute *gpio_keys_attrs[] = {
 	&dev_attr_keys.attr,
 	&dev_attr_switches.attr,
 	&dev_attr_disabled_keys.attr,
 	&dev_attr_disabled_switches.attr,
+#if defined(CONFIG_LGE_HALL_IC)
+#if defined(CONFIG_MACH_MSM8996_ELSA) || defined(CONFIG_MACH_MSM8996_ANNA)
+	&dev_attr_virtual_hallic_state.attr,
+#endif
+#endif
 	NULL,
 };
 
