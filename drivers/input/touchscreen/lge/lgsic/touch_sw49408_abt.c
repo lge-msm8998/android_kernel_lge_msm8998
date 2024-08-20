@@ -222,10 +222,8 @@ static int abt_ksocket_receive(unsigned char *buf, int len)
 	msg.msg_namelen  = sizeof(struct sockaddr_in);
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
-	/* [Bring-Up] Build error
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
-	*/
 	msg.msg_control = NULL;
 
 	oldfs = get_fs();
@@ -246,7 +244,7 @@ static void abt_ksocket_start_for_pctool(struct device *dev)
 {
 	static int client_connected;
 	int size, err;
-	unsigned char *buf;
+	unsigned char *buf = NULL;
 	struct socket *sock;
 
 	/* kernel thread initialization */
@@ -441,16 +439,14 @@ static uint32_t abt_ksocket_send_exit(void)
 	msg.msg_namelen  = sizeof(struct sockaddr_in);
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
-	/* [Bring-Up] Build error
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
-	*/
 	msg.msg_control = NULL;
 
 	oldfs = get_fs();
 
 	set_fs(KERNEL_DS);
-//	ret = sock_sendmsg(sock, &msg, 1);
+	ret = sock_sendmsg(sock, &msg, 1);
 	TOUCH_I(": exit send message return : %d\n", ret);
 	set_fs(oldfs);
 	sock_release(sock);
@@ -479,16 +475,14 @@ static int abt_ksocket_send(struct socket *sock,
 	msg.msg_namelen  = sizeof(struct sockaddr_in);
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
-	/* [Bring-Up] Build error
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
-	*/
 	msg.msg_control = NULL;
 
 	oldfs = get_fs();
 
 	set_fs(KERNEL_DS);
-//	size = sock_sendmsg(sock, &msg, len);
+	size = sock_sendmsg(sock, &msg, len);
 	set_fs(oldfs);
 
 	return size;

@@ -240,7 +240,7 @@ int sw49408_reg_write(struct device *dev, u16 addr, void *data, int size)
 	return 0;
 }
 
-/*
+
 static int sw49408_fb_notifier_callback(struct notifier_block *self,
 		unsigned long event, void *data)
 {
@@ -257,7 +257,7 @@ static int sw49408_fb_notifier_callback(struct notifier_block *self,
 
 	return 0;
 }
-*/
+
 static int sw49408_reset_ctrl(struct device *dev, int ctrl)
 {
 	struct touch_core_data *ts = to_touch_core(dev);
@@ -416,7 +416,7 @@ static void sw49408_get_swipe_info(struct device *dev)
 	d->swipe.info[SWIPE_U].start_area.y2 = 2780;
 	d->swipe.info[SWIPE_U].wrong_direction_thres = 5;
 	d->swipe.info[SWIPE_U].initial_ratio_dist = 4;
-	d->swipe.info[SWIPE_U].initial_ratio_thres = 41;
+	d->swipe.info[SWIPE_U].initial_ratio_thres = 100; // changed from 41 to 100
 
 	d->swipe.mode = 0;
 		/*SWIPE_RIGHT_BIT | SWIPE_DOWN_BIT |
@@ -2318,8 +2318,6 @@ static int sw49408_suspend(struct device *dev)
 	int ret = 0;
 
 	TOUCH_TRACE();
-	// temp LCD mode set
-	d->lcd_mode = LCD_MODE_U0;
 
 	if (touch_boot_mode() == TOUCH_CHARGER_MODE)
 		return -EPERM;
@@ -2345,12 +2343,9 @@ static int sw49408_suspend(struct device *dev)
 static int sw49408_resume(struct device *dev)
 {
 	struct touch_core_data *ts = to_touch_core(dev);
-	struct sw49408_data *d = to_sw49408_data(dev);
 	int mfts_mode = 0;
 
 	TOUCH_TRACE();
-	// temp LCD mode set
-	d->lcd_mode = LCD_MODE_U3;
 
 	mfts_mode = touch_boot_mode_check(dev);
 	if ((mfts_mode >= MINIOS_MFTS_FOLDER) && !ts->role.mfts_lpwg) {
@@ -2379,8 +2374,6 @@ static int sw49408_init(struct device *dev)
 	int ret = 0;
 
 	TOUCH_TRACE();
-/*	TOUCH_I("temp %d msleep for Video mode display transition\n", ts->caps.hw_reset_delay);
-	touch_msleep(ts->caps.hw_reset_delay);
 
 	if (atomic_read(&ts->state.core) == CORE_PROBE) {
 		TOUCH_I("fb_notif change\n");
@@ -2388,7 +2381,7 @@ static int sw49408_init(struct device *dev)
 		ts->fb_notif.notifier_call = sw49408_fb_notifier_callback;
 		fb_register_client(&ts->fb_notif);
 	}
-*/
+
 	TOUCH_I("%s: charger_state = 0x%02X\n", __func__, d->charger);
 	TOUCH_I("%s: runtime debug : %s\n", __func__,
 			atomic_read(&ts->state.debug_option_mask) &
@@ -2609,7 +2602,7 @@ int sw49408_check_status(struct device *dev)
 			length += snprintf(checking_log + length,
 				checking_log_size - length,
 				"[31]ESD(Stripe) error detected");
-//			lge_panel_recovery_mode();
+			lge_panel_recovery_mode();
 			ret = -ERANGE;
 		}
 
@@ -2841,7 +2834,7 @@ void sw49408_irq_runtime_engine_debug(struct device *dev)
 {
 	struct sw49408_data *d = to_sw49408_data(dev);
 
-	u8 ocd_debug[sizeof(d->info.debug)];
+	u8 ocd_debug[OCD_SIZE];
 	int a = 0;
 	int b = 0;
 	int start_point = 0;
@@ -3425,22 +3418,12 @@ static struct touch_hwif hwif = {
 
 static int __init touch_device_init(void)
 {
-#ifdef CONFIG_LGE_TOUCH_DUAL
-	int lcd_maker_id = 0;
-#endif
 	TOUCH_TRACE();
-#ifdef CONFIG_LGE_TOUCH_DUAL
-	lcd_maker_id = gpio_get_value(16);
-	TOUCH_I("lcd_maker_id = %d\n", lcd_maker_id);
-	if(lcd_maker_id){
-		return 0;
-	}
-#else
-	if (touch_get_device_type() != TYPE_SW49408 ) {
+
+	if (touch_get_device_type() != TYPE_SW49408) {
 		TOUCH_I("%s, sw49408 returned\n", __func__);
 		return 0;
 	}
-#endif
 
 	TOUCH_I("%s, sw49408 start\n", __func__);
 

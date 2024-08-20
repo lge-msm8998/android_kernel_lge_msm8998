@@ -555,7 +555,7 @@ static int sw49407_get_swipe_data(struct device *dev)
 
 	ts->lpwg.code_num = count;
 	ts->lpwg.code[0].x = rdata[1] & 0xffff;
-	ts->lpwg.code[0].y = rdata[1]  >> 16;
+	ts->lpwg.code[0].x = rdata[1]  >> 16;
 
 	ts->lpwg.code[count].x = -1;
 	ts->lpwg.code[count].y = -1;
@@ -660,7 +660,7 @@ static void sw49407_tci_area_set(struct device *dev, int cover_status)
 		sw49407_tci_active_area(dev, 480, 0, 1359, 160);
 		TOUCH_I("LPWG Active Area - QUICKCOVER_CLOSE\n");
 	} else {
-		sw49407_tci_active_area(dev, 80, 0, 1359, 2639);
+		sw49407_tci_active_area(dev, 80, 0, 1359, 2799);
 		TOUCH_I("LPWG Active Area - NORMAL\n");
 	}
 }
@@ -975,15 +975,11 @@ int sw49407_tc_driving(struct device *dev, int mode)
 	TOUCH_I("sw49407_tc_driving = %d, %x\n", mode, ctrl);
 	sw49407_reg_read(dev, spr_subdisp_st, (u8 *)&rdata, sizeof(u32));
 	TOUCH_I("DDI Display Mode = %d\n", rdata);
-	if ((mode == LCD_MODE_U0) && (d->prev_lcd_mode == LCD_MODE_U3)) {
-		queue_delayed_work(d->wq_log, &d->u0_set_work, msecs_to_jiffies(30));
-	} else {
-		sw49407_reg_write(dev, d->reg_info.r_tc_cmd_spi_addr + tc_driving_ctl,
+	sw49407_reg_write(dev, d->reg_info.r_tc_cmd_spi_addr + tc_driving_ctl,
 				&ctrl, sizeof(ctrl));
-	}
-
 	sw49407_reg_read(dev, rst_cnt_addr, &rst_cnt, sizeof(u32));
 	TOUCH_I("Reset Cnt : %d\n", rst_cnt);
+	touch_msleep(20);
 
 	return 0;
 }
@@ -1155,7 +1151,6 @@ static int sw49407_lpwg_mode(struct device *dev)
 		/* normal */
 		TOUCH_I("resume ts->lpwg.screen on\n");
 		sw49407_lpwg_control(dev, LPWG_NONE);
-		atomic_set(&d->global_reset, GLOBAL_RESET_DONE);
 		if (ts->lpwg.qcover == HALL_NEAR)
 			sw49407_tc_driving(dev, LCD_MODE_U3_QUICKCOVER);
 		else
@@ -1165,20 +1160,13 @@ static int sw49407_lpwg_mode(struct device *dev)
 		sw49407_deep_sleep(dev);
 	} else {
 		/* partial */
+		TOUCH_I("resume Partial\n");
 		if (ts->lpwg.qcover == HALL_NEAR)
 			sw49407_tci_area_set(dev, QUICKCOVER_CLOSE);
 		else
 			sw49407_tci_area_set(dev, QUICKCOVER_OPEN);
 		sw49407_lpwg_control(dev, ts->lpwg.mode);
-
-		if (atomic_read(&d->global_reset) == GLOBAL_RESETING) {
-			TOUCH_I("SKIP resume Partial\n");
-			atomic_set(&d->global_reset, GLOBAL_RESET_DONE);
-			sw49407_tc_driving(dev, d->lcd_mode);
-		} else {
-			TOUCH_I("resume Partial\n");
-			sw49407_tc_driving(dev, LCD_MODE_U3_PARTIAL);
-		}
+		sw49407_tc_driving(dev, LCD_MODE_U3_PARTIAL);
 	}
 
 	return 0;
@@ -1217,6 +1205,9 @@ static int sw49407_lpwg(struct device *dev, u32 code, void *param)
 		ts->lpwg.screen = value[1];
 		ts->lpwg.sensor = value[2];
 		ts->lpwg.qcover = value[3];
+//[BringUp]		if (sw49407_asc_usable(dev))	/* ASC */
+//[BringUp]			sw49407_asc_update_qcover_status(dev, value[3]);
+//[BringUp]		else
 
 		TOUCH_I(
 			"LPWG_UPDATE_ALL: mode[%d], screen[%s], sensor[%s], qcover[%s]\n",
@@ -1288,8 +1279,6 @@ static void sw49407_lcd_mode(struct device *dev, u32 mode)
 
 	d->prev_lcd_mode = d->lcd_mode;
 	d->lcd_mode = mode;
-	if (d->lcd_mode == LCD_MODE_U3)
-		atomic_set(&d->global_reset, GLOBAL_RESETING);
 	TOUCH_I("lcd_mode: %d (prev: %d)\n", d->lcd_mode, d->prev_lcd_mode);
 }
 
@@ -1418,7 +1407,8 @@ static int sw49407_debug_tool(struct device *dev, u32 value)
 	struct touch_core_data *ts = to_touch_core(dev);
 
 	if (value == DEBUG_TOOL_ENABLE) {
-		ts->driver->irq_handler = sw49407_sic_abt_irq_handler;
+//[BringUp]		ts->driver->irq_handler = sw49407_sic_abt_irq_handler;
+		ts->driver->irq_handler = sw49407_irq_handler;
 	} else {
 		ts->driver->irq_handler = sw49407_irq_handler;
 	}
@@ -1435,6 +1425,10 @@ static int sw49407_debug_option(struct device *dev, u32 *data)
 		TOUCH_I("Debug Option 0 %s\n", enable ? "Enable" : "Disable");
 		break;
 	case DEBUG_OPTION_1:
+//[BringUp]		if (enable)	/* ASC */
+//[BringUp]			sw49407_asc_control(dev, ASC_ON);
+//[BringUp]		else
+//[BringUp]			sw49407_asc_control(dev, ASC_OFF);
 		break;
 	case DEBUG_OPTION_2:
 		TOUCH_I("Debug Info %s\n", enable ? "Enable" : "Disable");
@@ -1454,19 +1448,6 @@ static int sw49407_debug_option(struct device *dev, u32 *data)
 	}
 
 	return 0;
-}
-
-static void sw49407_u0_set_work_func(struct work_struct *u0_set_work)
-{
-	struct sw49407_data *d =
-			container_of(to_delayed_work(u0_set_work),
-				struct sw49407_data, u0_set_work);
-	u32 ctrl = 0x01;
-
-	TOUCH_I("TC driving : U0\n");
-	sw49407_reg_write(d->dev, d->reg_info.r_tc_cmd_spi_addr + tc_driving_ctl,
-			&ctrl, sizeof(ctrl));
-
 }
 
 static void sw49407_debug_info_work_func(struct work_struct *debug_info_work)
@@ -1560,8 +1541,6 @@ static int sw49407_notify(struct device *dev, ulong event, void *data)
 		TOUCH_I("NOTIFY_TOUCH_RESET! return = %d\n", ret);
 		atomic_set(&d->init, IC_INIT_NEED);
 		atomic_set(&d->watch.state.rtc_status, RTC_CLEAR);
-		if (d->lcd_mode == LCD_MODE_U2)
-			atomic_set(&d->global_reset, GLOBAL_RESET_START);
 		ext_watch_get_current_time(dev, NULL, NULL);
 		break;
 	case LCD_EVENT_LCD_MODE:
@@ -1585,10 +1564,14 @@ static int sw49407_notify(struct device *dev, ulong event, void *data)
 	case NOTIFY_CONNECTION:
 		TOUCH_I("NOTIFY_CONNECTION!\n");
 		ret = sw49407_usb_status(dev, *(u32 *)data);
+//[BringUp]		if (sw49407_asc_usable(dev))	/* ASC */
+//[BringUp]			sw49407_asc_toggle_delta_check(dev);
 		break;
 	case NOTIFY_WIRELEES:
 		TOUCH_I("NOTIFY_WIRELEES!\n");
 		ret = sw49407_wireless_status(dev, *(u32 *)data);
+//[BringUp]		if (sw49407_asc_usable(dev))	/* ASC */
+//[BringUp]			sw49407_asc_toggle_delta_check(dev);
 		break;
 	case NOTIFY_EARJACK:
 		TOUCH_I("NOTIFY_EARJACK!\n");
@@ -1607,6 +1590,8 @@ static int sw49407_notify(struct device *dev, ulong event, void *data)
 		TOUCH_I("NOTIFY_CALL_STATE!\n");
 		ret = sw49407_reg_write(dev, d->reg_info.r_abt_cmd_spi_addr +
 			REG_CALL_STATE, (u32 *)data, sizeof(u32));
+//[BringUp]		if (sw49407_asc_usable(dev))	/* ASC */
+//[BringUp]			sw49407_asc_toggle_delta_check(dev);
 		break;
 	case NOTIFY_DEBUG_OPTION:
 		TOUCH_I("NOTIFY_DEBUG_OPTION!\n");
@@ -1614,6 +1599,10 @@ static int sw49407_notify(struct device *dev, ulong event, void *data)
 		break;
 	case NOTIFY_ONHAND_STATE:
 		TOUCH_I("NOTIFY_ONHAND_STATE!\n");
+//[BringUp]		if (sw49407_asc_usable(dev)) {	/* ASC */
+//[BringUp]			sw49407_asc_toggle_delta_check(dev);
+//[BringUp]			sw49407_asc_write_onhand(dev, *(u32 *)data);
+//[BringUp]		}
 		break;
 	default:
 		TOUCH_E("%lu is not supported\n", event);
@@ -1633,7 +1622,6 @@ static void sw49407_init_works(struct sw49407_data *d)
 		INIT_DELAYED_WORK(&d->debug_info_work,
 					sw49407_debug_info_work_func);
 
-	INIT_DELAYED_WORK(&d->u0_set_work, sw49407_u0_set_work_func);
 	INIT_DELAYED_WORK(&d->font_download_work, sw49407_font_download);
 	INIT_DELAYED_WORK(&d->te_test_work, sw49407_te_test_work_func);
 }
@@ -1692,7 +1680,8 @@ static int sw49407_probe(struct device *dev)
 	d->tci_debug_type = 1;
 	d->cfg_crc_err_cnt = 0;
 	d->code_crc_err_cnt = 0;
-	sw49407_sic_abt_probe();
+//[BringUp]	sw49407_sic_abt_probe();
+//[BringUp]	sw49407_asc_init(dev);	/* ASC */
 
 	return 0;
 }
@@ -1703,7 +1692,7 @@ static int sw49407_remove(struct device *dev)
 
 	TOUCH_TRACE();
 	pm_qos_remove_request(&d->pm_qos_req);
-	sw49407_sic_abt_remove();
+//[BringUp]	sw49407_sic_abt_remove();
 	sw49407_watch_remove(dev);
 	return 0;
 }
@@ -1732,31 +1721,30 @@ static int sw49407_fw_compare(struct device *dev, const struct firmware *fw)
 
 	memcpy(pid, &fw->data[bin_pid_offset], 8);
 
+	// [BringUp] bring up code for V-blank
+	TOUCH_I("device->major = %d, upgrade if not V 8.XX\n", device->major);
+	if (device->major != 8)
+		ts->force_fwup = 1;
+
 	if (ts->force_fwup) {
 		update = 1;
-		goto finish;
-	}
-
-	if (!ts->role.use_upgrade) {
-		update = 0;
-		goto finish;
-	}
-
-	if (binary->major != device->major) {
-		update = 1;
-	} else {
+	} else if (binary->major && device->major) {
 		if (binary->minor != device->minor)
 			update = 1;
 		else if (binary->build > device->build)
 			update = 1;
+	} else if (binary->major ^ device->major) {
+		update = 1;
+	} else if (!binary->major && !device->major) {
+		if (binary->minor > device->minor)
+			update = 1;
 	}
 
-finish:
 	TOUCH_I("%s : binary[%d.%02d.%d] device[%d.%02d.%d]" \
-		" -> update: %d, force: %d, use_upgrade: %d\n", __func__,
+		" -> update: %d, force: %d\n", __func__,
 		binary->major, binary->minor, binary->build,
 		device->major, device->minor, device->build,
-		update, ts->force_fwup, ts->role.use_upgrade);
+		update, ts->force_fwup);
 
 	return update;
 }
@@ -1790,7 +1778,7 @@ static int sw49407_condition_wait(struct device *dev,
 	return -EPERM;
 }
 
-int common_header_verify(t_cfg_info_def *header)
+int sw49407_common_header_verify(t_cfg_info_def *header)
 {
 	t_cfg_info_def *head = (t_cfg_info_def *)header;
 	t_cfg_c_header_def *common_head =
@@ -1847,7 +1835,7 @@ int common_header_verify(t_cfg_info_def *header)
 	return 1;
 }
 
-int specific_header_verify(unsigned char *header, int i)
+int sw49407_specific_header_verify(unsigned char *header, int i)
 {
 	t_cfg_s_header_def *head = (t_cfg_s_header_def *)header;
 	char tmp[8] = {0, };
@@ -1902,14 +1890,14 @@ static int sw49407_img_binary_verify(unsigned char *imgBuf)
 		TOUCH_I("Firmware CRC READ : 0x%X\n", *fw_crc);
 	}
 
-	if (common_header_verify(head) < 0) {
+	if (sw49407_common_header_verify(head) < 0) {
 		TOUCH_I("No Common CFG! Firmware Code Only\n");
 		return E_FW_CODE_ONLY_VALID;
 	}
 
 	specific_ptr = cfg_buf_base + head->cfg_size.b.common_cfg_size;
 	for (i = 0; i < head->cfg_specific_cnt; i++) {
-		if (specific_header_verify(specific_ptr, i) < 0) {
+		if (sw49407_specific_header_verify(specific_ptr, i) < 0) {
 			TOUCH_I("specific CFG invalid!\n");
 			return -2;
 		}
@@ -2191,8 +2179,7 @@ static int sw49407_upgrade(struct device *dev)
 		TOUCH_I("get fwpath from test_fwpath:%s\n",
 			&ts->test_fwpath[0]);
 	} else if (ts->def_fwcnt) {
-		if (!strcmp(d->ic_info.product_id, "L1L57P1") ||
-				!strcmp(d->ic_info.product_id, "L1L52P1")) {
+		if (!strcmp(d->ic_info.product_id, "L1L57P1")) {
 			memcpy(fwpath, ts->def_fwpath[0], sizeof(fwpath));
 			TOUCH_I("get fwpath from def_fwpath : rev:%d\n",
 			d->ic_info.revision);
@@ -2307,6 +2294,8 @@ static int sw49407_init(struct device *dev)
 	int ret = 0;
 
 	TOUCH_TRACE();
+	TOUCH_I("temp %d msleep for Video mode display transition\n", ts->caps.hw_reset_delay);
+	touch_msleep(ts->caps.hw_reset_delay);
 
 	if (atomic_read(&ts->state.core) == CORE_PROBE) {
 		TOUCH_I("fb_notif change\n");
@@ -2318,7 +2307,8 @@ static int sw49407_init(struct device *dev)
 	TOUCH_I("%s: charger_state = 0x%02X\n", __func__, d->charger);
 
 	if (atomic_read(&ts->state.debug_tool) == DEBUG_TOOL_ENABLE)
-		sw49407_sic_abt_init(dev);
+//[BringUp]		sw49407_sic_abt_init(dev);
+		TOUCH_I("Debug Tool enable but do nothing\n");
 
 	if (sw49407_chip_info_load(dev) < 0) {
 		TOUCH_E("IC_Register map load fail!\n");
@@ -2380,6 +2370,20 @@ static int sw49407_init(struct device *dev)
 		atomic_read(&d->watch.state.rtc_status) == RTC_RUN &&
 		d->watch.ext_wdata.time.disp_waton)
 			ext_watch_get_current_time(dev, NULL, NULL);
+#if 0 //[BringUp]
+	if (sw49407_asc_usable(dev)) {
+		if (atomic_read(&ts->state.core) == CORE_UPGRADE) {
+			sw49407_asc_control(dev, ASC_OFF);
+			sw49407_asc_control(dev, ASC_ON);
+		}
+
+		if (atomic_read(&ts->state.core) == CORE_NORMAL) {
+			sw49407_asc_toggle_delta_check(dev);
+			sw49407_asc_write_onhand(dev,
+					atomic_read(&ts->state.onhand));
+		}
+	}
+#endif //[BringUp]
 	sw49407_te_info(dev, NULL);
 
 	return 0;
@@ -2868,6 +2872,9 @@ int sw49407_irq_handler(struct device *dev)
 		goto error;
 	if (d->info.wakeup_type == ABS_MODE) {
 		ret = sw49407_irq_abs(dev);
+//[BringUp]		if (sw49407_asc_delta_chk_usable(dev))	/* ASC */
+//[BringUp]			queue_delayed_work(ts->wq,
+//[BringUp]					&(d->asc.finger_input_work), 0);
 	} else {
 		ret = sw49407_irq_lpwg(dev);
 	}
@@ -3029,9 +3036,12 @@ static ssize_t store_q_sensitivity(struct device *dev, const char *buf,
 		return count;
 
 	d->q_sensitivity = value;
-//	sw49407_reg_write(dev, QCOVER_SENSITIVITY, &d->q_sensitivity, sizeof(u32));
+	sw49407_reg_write(dev, d->reg_info.r_abt_cmd_spi_addr +
+				QCOVER_SENSITIVITY,
+				&d->q_sensitivity, sizeof(u32));
 
-	TOUCH_I("%s : %s(%d) - skip\n", __func__, value ? "SENSITIVE" : "NORMAL", value);
+	TOUCH_I("%s : %s(%d)\n", __func__,
+			value ? "SENSITIVE" : "NORMAL", value);
 
 	return count;
 }
@@ -3060,7 +3070,7 @@ static ssize_t show_te_result(struct device *dev, char *buf)
 			d->te_ret ? "Fail" : "Pass");
 
 	if (d->te_write_log == DO_WRITE_LOG) {
-		sw49407_te_test_logging(d->dev, buf);
+//[BringUp]		sw49407_te_test_logging(d->dev, buf);
 		d->te_write_log = LOG_WRITE_DONE;
 	}
 
@@ -3138,9 +3148,10 @@ static int sw49407_register_sysfs(struct device *dev)
 	if (ret < 0)
 		TOUCH_E("sw49407 sysfs register failed\n");
 
-	sw49407_watch_register_sysfs(dev);
-	sw49407_prd_register_sysfs(dev);
-	sw49407_sic_abt_register_sysfs(&ts->kobj);
+//[BringUp]	sw49407_watch_register_sysfs(dev);
+//[BringUp]	sw49407_prd_register_sysfs(dev);
+//[BringUp]	sw49407_asc_register_sysfs(dev);	/* ASC */
+//[BringUp]	sw49407_sic_abt_register_sysfs(&ts->kobj);
 
 	return 0;
 }
@@ -3265,6 +3276,7 @@ static struct touch_driver touch_driver = {
 
 static struct of_device_id touch_match_ids[] = {
 	{ .compatible = MATCH_NAME, },
+	{},
 };
 
 static struct touch_hwif hwif = {
@@ -3281,12 +3293,12 @@ static int __init touch_device_init(void)
 {
 	TOUCH_TRACE();
 
-//	if (touch_get_device_type() != TYPE_SW49407 ) {
-//		TOUCH_I("%s, sw49407 returned\n", __func__);
-//		return 0;
-//	}
+	if (touch_get_device_type() != TYPE_SW49407_LUCY_VIDEO) {
+		TOUCH_I("%s, sw49407_lucye returned\n", __func__);
+		return 0;
+	}
 
-	TOUCH_I("%s, sw49407 start\n", __func__);
+	TOUCH_I("%s, sw49407_lucye start\n", __func__);
 
 	return touch_bus_device_init(&hwif, &touch_driver);
 }

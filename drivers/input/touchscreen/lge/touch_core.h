@@ -586,7 +586,14 @@ extern void touch_suspend(struct device *dev);
 extern void touch_resume(struct device *dev);
 
 enum touch_device_type {
+	TYPE_LG4946 = 0,
+	TYPE_LG4945,
+	TYPE_S3320,
+	TYPE_TD4302,
 	TYPE_SW49407,
+	TYPE_SW49407_COMMAND,
+	TYPE_SW49407_VIDEO,
+	TYPE_SW49407_LUCY_VIDEO,
 	TYPE_SW49408,
 	TYPE_NOTOUCH,
 	TYPE_FTM4,

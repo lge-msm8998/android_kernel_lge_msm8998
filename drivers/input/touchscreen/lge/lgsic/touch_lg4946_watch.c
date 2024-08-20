@@ -1,4 +1,4 @@
-/* touch_sw49407_watch.c
+/* touch_lg4946_watch.c
  *
  * Copyright (C) 2015 LGE.
  *
@@ -30,8 +30,45 @@
 /*
  *  Include to Local Header File
  */
-#include "touch_sw49407.h"
-#include "touch_sw49407_watch.h"
+#include "touch_lg4946.h"
+#include "touch_lg4946_watch.h"
+
+// LOOK UP TABLE for CRC16 generation
+// Polynomial X^16+X^15+X^2+1
+u16 lg4946_crc16lut[] = {
+	0x0000, 0x8005, 0x800F, 0x000A, 0x801B, 0x001E, 0x0014, 0x8011,
+	0x8033, 0x0036, 0x003C, 0x8039, 0x0028, 0x802D, 0x8027, 0x0022,
+	0x8063, 0x0066, 0x006C, 0x8069, 0x0078, 0x807D, 0x8077, 0x0072,
+	0x0050, 0x8055, 0x805F, 0x005A, 0x804B, 0x004E, 0x0044, 0x8041,
+	0x80C3, 0x00C6, 0x00CC, 0x80C9, 0x00D8, 0x80DD, 0x80D7, 0x00D2,
+	0x00F0, 0x80F5, 0x80FF, 0x00FA, 0x80EB, 0x00EE, 0x00E4, 0x80E1,
+	0x00A0, 0x80A5, 0x80AF, 0x00AA, 0x80BB, 0x00BE, 0x00B4, 0x80B1,
+	0x8093, 0x0096, 0x009C, 0x8099, 0x0088, 0x808D, 0x8087, 0x0082,
+	0x8183, 0x0186, 0x018C, 0x8189, 0x0198, 0x819D, 0x8197, 0x0192,
+	0x01B0, 0x81B5, 0x81BF, 0x01BA, 0x81AB, 0x01AE, 0x01A4, 0x81A1,
+	0x01E0, 0x81E5, 0x81EF, 0x01EA, 0x81FB, 0x01FE, 0x01F4, 0x81F1,
+	0x81D3, 0x01D6, 0x01DC, 0x81D9, 0x01C8, 0x81CD, 0x81C7, 0x01C2,
+	0x0140, 0x8145, 0x814F, 0x014A, 0x815B, 0x015E, 0x0154, 0x8151,
+	0x8173, 0x0176, 0x017C, 0x8179, 0x0168, 0x816D, 0x8167, 0x0162,
+	0x8123, 0x0126, 0x012C, 0x8129, 0x0138, 0x813D, 0x8137, 0x0132,
+	0x0110, 0x8115, 0x811F, 0x011A, 0x810B, 0x010E, 0x0104, 0x8101,
+	0x8303, 0x0306, 0x030C, 0x8309, 0x0318, 0x831D, 0x8317, 0x0312,
+	0x0330, 0x8335, 0x833F, 0x033A, 0x832B, 0x032E, 0x0324, 0x8321,
+	0x0360, 0x8365, 0x836F, 0x036A, 0x837B, 0x037E, 0x0374, 0x8371,
+	0x8353, 0x0356, 0x035C, 0x8359, 0x0348, 0x834D, 0x8347, 0x0342,
+	0x03C0, 0x83C5, 0x83CF, 0x03CA, 0x83DB, 0x03DE, 0x03D4, 0x83D1,
+	0x83F3, 0x03F6, 0x03FC, 0x83F9, 0x03E8, 0x83ED, 0x83E7, 0x03E2,
+	0x83A3, 0x03A6, 0x03AC, 0x83A9, 0x03B8, 0x83BD, 0x83B7, 0x03B2,
+	0x0390, 0x8395, 0x839F, 0x039A, 0x838B, 0x038E, 0x0384, 0x8381,
+	0x0280, 0x8285, 0x828F, 0x028A, 0x829B, 0x029E, 0x0294, 0x8291,
+	0x82B3, 0x02B6, 0x02BC, 0x82B9, 0x02A8, 0x82AD, 0x82A7, 0x02A2,
+	0x82E3, 0x02E6, 0x02EC, 0x82E9, 0x02F8, 0x82FD, 0x82F7, 0x02F2,
+	0x02D0, 0x82D5, 0x82DF, 0x02DA, 0x82CB, 0x02CE, 0x02C4, 0x82C1,
+	0x8243, 0x0246, 0x024C, 0x8249, 0x0258, 0x825D, 0x8257, 0x0252,
+	0x0270, 0x8275, 0x827F, 0x027A, 0x826B, 0x026E, 0x0264, 0x8261,
+	0x0220, 0x8225, 0x822F, 0x022A, 0x823B, 0x023E, 0x0234, 0x8231,
+	0x8213, 0x0216, 0x021C, 0x8219, 0x0208, 0x820D, 0x8207, 0x0202
+};
 
 static int ext_watch_rtc_start(struct device *dev, u8 start)
 {
@@ -41,7 +78,7 @@ static int ext_watch_rtc_start(struct device *dev, u8 start)
 	if (start == EXT_WATCH_RTC_START)
 		rtc_ctrl = EXT_WATCH_RTC_START;
 
-	ret = sw49407_reg_write(dev, EXT_WATCH_RTC_RUN,
+	ret = lg4946_reg_write(dev, EXT_WATCH_RTC_RUN,
 		(u8 *)&rtc_ctrl, sizeof(u32));
 	if (ret)
 		goto error;
@@ -56,12 +93,10 @@ error:
 
 static int ext_watch_get_mode(struct device *dev, char *buf, int *len)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
-	struct ext_watch_ctrl_cfg mode_cfg;
-	struct ext_watch_lut_cfg lut_cfg;
+	struct ext_watch_mode_cfg mode;
 	struct ext_watch_lut_bits *lut = NULL;
-	u32 wdata;
 	u8 *ptr = NULL;
 	u16 idx = 0;
 	int ret = 0;
@@ -70,81 +105,66 @@ static int ext_watch_get_mode(struct device *dev, char *buf, int *len)
 
 	TOUCH_I("%s start\n", __func__);
 
-	memset(&mode_cfg, 0x0, sizeof(struct ext_watch_ctrl_cfg));
-	memset(&lut_cfg, 0x0, sizeof(struct ext_watch_lut_cfg));
+	memset(&mode, 0x0, sizeof(struct ext_watch_mode_cfg));
 
-	sw49407_xfer_msg_ready(dev, 2);
+	lg4946_xfer_msg_ready(dev, 5);
 
-	ts->xfer->data[0].tx.addr = EXT_WATCH_DCST_OFFSET;
-	wdata = EXT_WATCH_CTRL_DCST_OFT;
-	ts->xfer->data[0].tx.buf = (u8 *)&wdata;
-	ts->xfer->data[0].tx.size = sizeof(u32);
-	ts->xfer->data[0].rx.size = 0;
+	ts->xfer->data[0].rx.addr = EXT_WATCH_CTRL;
+	ts->xfer->data[0].rx.buf = (u8 *)(&mode.watch_ctrl);
+	ts->xfer->data[0].rx.size = sizeof(u32);
 
-	ts->xfer->data[1].rx.addr = EXT_WATCH_DCST_ADDR;
-	ts->xfer->data[1].rx.buf = (u8 *)&mode_cfg;
-	ts->xfer->data[1].rx.size = sizeof(struct ext_watch_ctrl_cfg);
+	ts->xfer->data[1].rx.addr = EXT_WATCH_AREA_X;
+	ts->xfer->data[1].rx.buf = (u8 *)(&mode.watch_area_x);
+	ts->xfer->data[1].rx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ts->xfer->data[2].rx.addr = EXT_WATCH_AREA_Y;
+	ts->xfer->data[2].rx.buf = (u8 *)(&mode.watch_area_y);
+	ts->xfer->data[2].rx.size = sizeof(u32);
+
+	ts->xfer->data[3].rx.addr = EXT_WATCH_BLINK_AREA;
+	ts->xfer->data[3].rx.buf = (u8 *)(&mode.blink_area);
+	ts->xfer->data[3].rx.size = sizeof(u32);
+
+	ts->xfer->data[4].rx.addr = EXT_WATCH_LUT;
+	ts->xfer->data[4].rx.buf = (u8 *)(mode.lut);
+	ts->xfer->data[4].rx.size = sizeof(u32) * EXT_WATCH_LUT_NUM;
+
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret)
 		goto error;
 
-	sw49407_xfer_msg_ready(dev, 2);
-
-	ts->xfer->data[0].tx.addr = EXT_WATCH_DCST_OFFSET;
-	wdata = EXT_WATCH_LUT_DCST_OFT;
-	ts->xfer->data[0].tx.buf = (u8 *)&wdata;
-	ts->xfer->data[0].tx.size = sizeof(u32);
-	ts->xfer->data[0].rx.size = 0;
-
-	ts->xfer->data[1].rx.addr = EXT_WATCH_DCST_ADDR;
-	ts->xfer->data[1].rx.buf = (u8 *)&lut_cfg;
-	ts->xfer->data[1].rx.size = sizeof(struct ext_watch_lut_cfg);
-
-	ret = sw49407_xfer_msg(dev, ts->xfer);
-	if (ret)
-		goto error;
-
-	ptr = (u8 *)(&mode_cfg);
+	ptr = (u8 *)(&mode.watch_ctrl);
 	loglen = snprintf(log, 256,
-		"watch_ctrl %02X %02X (Mode:%d, Alpha:%X)\n",
-		ptr[0], ptr[1],
-		mode_cfg.u2_u3_disp_on, mode_cfg.alpha |
-		(mode_cfg.alpha_fg << 8));
+		"Get Offset[%X] watch_ctrl %02X %02X (Mode:%d, Alpha:%X)\n",
+		EXT_WATCH_CTRL, ptr[0], ptr[1],
+		mode.watch_ctrl.dispmode, mode.watch_ctrl.alpha);
 	memcpy(&buf[*len], log, loglen);
 	*len += loglen;
 	TOUCH_I("%s", log);
 
 	loglen = snprintf(log, 256,
-			"Watch area x[%d , %d] y[%d , %d]\n",
-			mode_cfg.watch_x_start_7to0 |
-				(mode_cfg.watch_x_start_11to8 << 8),
-			mode_cfg.watch_x_end_3to0   |
-				(mode_cfg.watch_x_end_11to4 << 4),
-			mode_cfg.watch_y_start_7to0 |
-				(mode_cfg.watch_y_start_11to8 << 8),
-			mode_cfg.watch_y_end_3to0   |
-				(mode_cfg.watch_y_end_11to4 << 4));
+		"Get Offset[%X] Watch area x[%d , %d] y[%d , %d]\n",
+		EXT_WATCH_AREA_X,
+		mode.watch_area_x.watstart, mode.watch_area_x.watend,
+		mode.watch_area_y.watstart, mode.watch_area_y.watend);
 	memcpy(&buf[*len], log, loglen);
 	*len += loglen;
 	TOUCH_I("%s", log);
 
-	loglen = snprintf(log, 256, "Blink area x[%d , %d]\n",
-				mode_cfg.blink_x_start_7to0 |
-					(mode_cfg.blink_x_start_11to8 << 8),
-				mode_cfg.blink_x_end_3to0   |
-					(mode_cfg.blink_x_end_11to4 << 4));
+	loglen = snprintf(log, 256, "Get Offset[%X] Blink area x[%d , %d]\n",
+		EXT_WATCH_BLINK_AREA,
+		mode.blink_area.bstartx, mode.blink_area.bendx);
 	memcpy(&buf[*len], log, loglen);
 	*len += loglen;
 	TOUCH_I("%s", log);
 
-	loglen = snprintf(log, 256 - loglen, "LUT[%d] ", EXT_WATCH_LUT_MAX);
+	loglen = snprintf(log, 256 - loglen, "Get Offset[%X] LUT[%d] ",
+		EXT_WATCH_LUT, EXT_WATCH_LUT_NUM);
 
-	for (idx = 0; idx < EXT_WATCH_LUT_MAX; idx++) {
-		lut = &lut_cfg.lut[idx];
-		loglen += snprintf(log + loglen, 256 - loglen,
-					"%d:%02X%02X%02X ", idx + 1,
-					lut->b, lut->g, lut->r);
+	for (idx = 0; idx < EXT_WATCH_LUT_NUM; idx++) {
+		lut = &mode.lut[idx];
+		loglen += snprintf(log + loglen, 256 - loglen, "%d:%02X%02X%02X ",
+			idx + 1, lut->b, lut->g, lut->r);
 	}
 
 	loglen += snprintf(log + loglen, 256 - loglen, "\n");
@@ -164,7 +184,7 @@ error:
 
 static int ext_watch_get_position(struct device *dev, char *buf, int *len)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	struct ext_watch_position_cfg position = {0};
 	struct ext_watch_status_cfg status_cfg = {0};
@@ -172,25 +192,22 @@ static int ext_watch_get_position(struct device *dev, char *buf, int *len)
 	char log[256] = {0};
 	int loglen = 0;
 
-	sw49407_xfer_msg_ready(dev, 2);
+	lg4946_xfer_msg_ready(dev, 2);
 
-	ts->xfer->data[0].rx.addr = d->reg_info.r_tc_sts_spi_addr +
-							EXT_WATCH_POSITION_R;
+	ts->xfer->data[0].rx.addr = EXT_WATCH_POSITION_R;
 	ts->xfer->data[0].rx.buf = (u8 *)(&position);
 	ts->xfer->data[0].rx.size = sizeof(u32) * 3;
 
-	ts->xfer->data[1].rx.addr = d->reg_info.r_tc_sts_spi_addr +
-							EXT_WATCH_STATUS;
+	ts->xfer->data[1].rx.addr = EXT_WATCH_STATE;
 	ts->xfer->data[1].rx.buf = (u8 *)&status_cfg;
 	ts->xfer->data[1].rx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret)
 		goto error;
 
 	loglen = snprintf(log, 256,"Get Offset[%X] Position [%d %d %d %d %d]\n",
-		d->reg_info.r_aod_spi_addr + EXT_WATCH_POSITION_R,
-					position.h10x_pos, position.h1x_pos,
+		EXT_WATCH_POSITION_R, position.h10x_pos, position.h1x_pos,
 		position.clx_pos, position.m10x_pos, position.m1x_pos);
 	memcpy(&buf[*len], log, loglen);
 	*len += loglen;
@@ -204,8 +221,7 @@ static int ext_watch_get_position(struct device *dev, char *buf, int *len)
 
 	loglen = snprintf(log, 256,
 		"Get Offset[%X] Zero Display[%d], 24H Mode[%d], Clock Mode[%d]\n",
-		d->reg_info.r_aod_spi_addr + EXT_WATCH_STATUS,
-        position.zero_disp, position.h24_en,
+		EXT_WATCH_STATE, position.zero_disp, position.h24_en,
 		position.clock_disp_mode);
 	memcpy(&buf[*len], log, loglen);
 	*len += loglen;
@@ -232,7 +248,7 @@ error:
 
 int ext_watch_get_current_time(struct device *dev, char *buf, int *len)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	struct ext_watch_status_cfg status_cfg = {0};
 	int ret = 0;
@@ -241,10 +257,9 @@ int ext_watch_get_current_time(struct device *dev, char *buf, int *len)
 
 	TOUCH_TRACE();
 
-	sw49407_xfer_msg_ready(dev, 2);
+	lg4946_xfer_msg_ready(dev, 2);
 
-	ts->xfer->data[0].rx.addr = d->reg_info.r_tc_sts_spi_addr +
-							EXT_WATCH_STATUS;
+	ts->xfer->data[0].rx.addr = EXT_WATCH_STATE;
 	ts->xfer->data[0].rx.buf = (u8 *)&status_cfg;
 	ts->xfer->data[0].rx.size = sizeof(u32);
 
@@ -252,7 +267,7 @@ int ext_watch_get_current_time(struct device *dev, char *buf, int *len)
 	ts->xfer->data[1].rx.buf = (u8 *)&d->watch.ext_wdata.time.rtc_ctst;
 	ts->xfer->data[1].rx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret < 0) {
 		TOUCH_E("%s Fail\n", __func__);
 		return ret;
@@ -276,63 +291,50 @@ int ext_watch_get_current_time(struct device *dev, char *buf, int *len)
 
 static int ext_watch_set_mode(struct device *dev, char log)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
-	struct ext_watch_ctrl_cfg *mode_cfg = &d->watch.ext_wdata.mode;
-	struct ext_watch_lut_cfg *lut_cfg = &d->watch.ext_wdata.lut;
-	u32 wdata;
+	struct ext_watch_mode_cfg *mode = &d->watch.ext_wdata.mode;
 	int ret = 0;
 
-	sw49407_xfer_msg_ready(dev, 2);
+	lg4946_xfer_msg_ready(dev, 5);
 
-	ts->xfer->data[0].tx.addr = EXT_WATCH_DCST_OFFSET;
-	wdata = EXT_WATCH_CTRL_DCST_OFT;
-	ts->xfer->data[0].tx.buf = (u8 *)&wdata;
+	ts->xfer->data[0].tx.addr = EXT_WATCH_CTRL;
+	ts->xfer->data[0].tx.buf = (u8 *)(&d->watch.ext_wdata.mode.watch_ctrl);
 	ts->xfer->data[0].tx.size = sizeof(u32);
-	ts->xfer->data[0].rx.size = 0;
 
-	ts->xfer->data[1].tx.addr = EXT_WATCH_DCST_ADDR;
-	ts->xfer->data[1].tx.buf = (u8 *)mode_cfg;
-	ts->xfer->data[1].tx.size = sizeof(struct ext_watch_ctrl_cfg);
+	ts->xfer->data[1].tx.addr = EXT_WATCH_AREA_X;
+	ts->xfer->data[1].tx.buf = (u8 *)(&d->watch.ext_wdata.mode.watch_area_x);
+	ts->xfer->data[1].tx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
-	if (ret < 0)
-		TOUCH_E("failed %d\n", ret);
+	ts->xfer->data[2].tx.addr = EXT_WATCH_AREA_Y;
+	ts->xfer->data[2].tx.buf = (u8 *)(&d->watch.ext_wdata.mode.watch_area_y);
+	ts->xfer->data[2].tx.size = sizeof(u32);
 
-	sw49407_xfer_msg_ready(dev, 2);
+	ts->xfer->data[3].tx.addr = EXT_WATCH_BLINK_AREA;
+	ts->xfer->data[3].tx.buf = (u8 *)(&d->watch.ext_wdata.mode.blink_area);
+	ts->xfer->data[3].tx.size = sizeof(u32);
 
-	ts->xfer->data[0].tx.addr = EXT_WATCH_DCST_OFFSET;
-	wdata = EXT_WATCH_LUT_DCST_OFT;
-	ts->xfer->data[0].tx.buf = (u8 *)&wdata;
-	ts->xfer->data[0].tx.size = sizeof(u32);
-	ts->xfer->data[0].rx.size = 0;
+	ts->xfer->data[4].tx.addr = EXT_WATCH_LUT;
+	ts->xfer->data[4].tx.buf = (u8 *)(&d->watch.ext_wdata.mode.lut[0]);
+	ts->xfer->data[4].tx.size = sizeof(u32) * EXT_WATCH_LUT_NUM;
 
-	ts->xfer->data[1].tx.addr = EXT_WATCH_DCST_ADDR;
-	ts->xfer->data[1].tx.buf = (u8 *)lut_cfg;
-	ts->xfer->data[1].tx.size = sizeof(struct ext_watch_lut_cfg);
-
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret < 0) {
 		TOUCH_E("failed %d\n", ret);
 	} else if (log) {
 		TOUCH_I("\t%s : X[%d , %d] Y[%d , %d] LUT[%02X%02X%02X]\n",
 			__func__,
-			mode_cfg->watch_x_start_7to0 |
-				(mode_cfg->watch_x_start_11to8 << 8),
-			mode_cfg->watch_x_end_3to0   |
-				(mode_cfg->watch_x_end_11to4 << 4),
-			mode_cfg->watch_y_start_7to0 |
-				(mode_cfg->watch_y_start_11to8 << 8),
-			mode_cfg->watch_y_end_3to0   |
-				(mode_cfg->watch_y_end_11to4 << 4),
-			lut_cfg->lut[6].b, lut_cfg->lut[6].g, lut_cfg->lut[6].r);
+			mode->watch_area_x.watstart, mode->watch_area_x.watend,
+			mode->watch_area_y.watstart, mode->watch_area_y.watend,
+			mode->lut[6].b, mode->lut[6].g, mode->lut[6].r);
 	}
+
 	return ret;
 }
 
 static int ext_watch_set_current_time(struct device *dev)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	u32 rtc_ctrl = 0;
 	u16 rtc_count = 305;		/* 30.5 us */
@@ -347,7 +349,7 @@ static int ext_watch_set_current_time(struct device *dev)
 	if (ret)
 		goto error;
 
-	sw49407_xfer_msg_ready(dev, 3);
+	lg4946_xfer_msg_ready(dev, 3);
 
 	ts->xfer->data[0].tx.addr = EXT_WATCH_RTC_SCT;
 	ts->xfer->data[0].tx.buf = (u8 *)&d->watch.ext_wdata.time.rtc_sct;
@@ -361,7 +363,7 @@ static int ext_watch_set_current_time(struct device *dev)
 	ts->xfer->data[2].tx.buf = (u8 *)&rtc_ctrl;
 	ts->xfer->data[2].tx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret)
 		goto error;
 
@@ -386,13 +388,13 @@ error:
 
 static int ext_watch_set_position(struct device *dev, char log)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	u8 *ptr = (u8 *)(&d->watch.ext_wdata.position);
 	struct ext_watch_position_cfg *cfg = &d->watch.ext_wdata.position;
 	int ret = 0;
 
-	sw49407_xfer_msg_ready(dev, 5);
+	lg4946_xfer_msg_ready(dev, 5);
 
 	ts->xfer->data[0].tx.addr = EXT_WATCH_POSITION;
 	ts->xfer->data[0].tx.buf = ptr;
@@ -414,7 +416,7 @@ static int ext_watch_set_position(struct device *dev, char log)
 	ts->xfer->data[4].tx.buf = &ptr[16];
 	ts->xfer->data[4].tx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret) {
 		goto error;
 	} else if (log) {
@@ -431,22 +433,29 @@ error:
 
 static int ext_watch_display_onoff(struct device *dev, char log)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int ret = 0;
 
 	if ((atomic_read(&d->watch.state.rtc_status) != RTC_RUN) &&
-			d->watch.ext_wdata.time.disp_waton) {
-		d->watch.ext_wdata.time.rtc_sct.hour =
-					d->watch.ext_wdata.time.rtc_ctst.hour;
-		d->watch.ext_wdata.time.rtc_sct.min =
-					d->watch.ext_wdata.time.rtc_ctst.min;
-		d->watch.ext_wdata.time.rtc_sct.sec =
-					d->watch.ext_wdata.time.rtc_ctst.sec;
+		d->watch.ext_wdata.time.disp_waton) {
+		d->watch.ext_wdata.time.rtc_sct.hour = d->watch.ext_wdata.time.rtc_ctst.hour;
+		d->watch.ext_wdata.time.rtc_sct.min = d->watch.ext_wdata.time.rtc_ctst.min;
+		d->watch.ext_wdata.time.rtc_sct.sec = d->watch.ext_wdata.time.rtc_ctst.sec;
 		d->watch.ext_wdata.time.rtc_sctcnt = 0;
 		ret = ext_watch_set_current_time(dev);
 	}
 
-	ret = sw49407_reg_write(dev, EXT_WATCH_DISPLAY_ON,
+	if ((d->lcd_mode == LCD_MODE_U2
+		|| d->lcd_mode == LCD_MODE_U2_UNBLANK)
+		&& d->watch.ext_wdata.time.disp_waton) {
+		ret = lg4946_reg_write(dev, EXT_WATCH_DCS_CTRL,
+				&d->watch.ext_wdata.time.disp_waton, sizeof(u32));
+		if (log)
+			TOUCH_I("%s(%X) : %s for U2\n", __func__, EXT_WATCH_DCS_CTRL,
+				d->watch.ext_wdata.time.disp_waton ? "On" : "Off");
+	}
+
+	ret = lg4946_reg_write(dev, EXT_WATCH_DISPLAY_ON,
 			&d->watch.ext_wdata.time.disp_waton, sizeof(u32));
 	if (ret)
 		goto error;
@@ -462,19 +471,53 @@ error:
 	return -EIO;
 }
 
-void sw49407_watch_display_off(struct device *dev)
+void lg4946_watch_display_off(struct device *dev)
 {
 	u32 disp = 0;
 
-	sw49407_reg_write(dev, EXT_WATCH_DISPLAY_ON, &disp, sizeof(u32));
+	lg4946_reg_write(dev, EXT_WATCH_DISPLAY_ON, &disp, sizeof(u32));
 
 	TOUCH_I("%s\n", __func__);
 }
 
-void sw49407_font_download(struct work_struct *font_download_work)
+u16 lg4946_crc16wordcalc(const u16 *data, u32 datalen, u16 initval)
 {
-	struct sw49407_data *d = container_of(to_delayed_work(font_download_work),
-				struct sw49407_data, font_download_work);
+	u32 i = 0;
+	u16 CRCSum = 0;
+	u8 tempData = 0;
+
+	CRCSum = initval;
+	for (i = 0; i < datalen; i += 2) {
+		tempData = (u8)((data[i] >> 8) & 0xFF);
+		CRCSum = (CRCSum << 8) ^
+			lg4946_crc16lut[((CRCSum >> 8) & 0xFF) ^ tempData];
+
+		tempData = (u8)(data[i] & 0xFF);
+		CRCSum = (CRCSum << 8) ^
+			lg4946_crc16lut[((CRCSum >> 8) & 0xFF) ^ tempData];
+	}
+
+	return CRCSum;
+}
+
+u32 lg4946_font_crc_cal(char *data, u32 data_size)
+{
+	u32 crc_value = 0;
+	u32 crc_size = 0;
+
+	crc_size = sizeof(struct ext_watch_font_header) + data_size;
+
+	/*CRC Calculation*/
+	crc_value = lg4946_crc16wordcalc((const u16*)&data[0], crc_size / 2, 0) \
+		| (lg4946_crc16wordcalc((const u16*)&data[2], crc_size / 2, 0) << 16);
+
+	return crc_value & 0x3FFFFFFF;
+}
+
+void lg4946_font_download(struct work_struct *font_download_work)
+{
+	struct lg4946_data *d = container_of(to_delayed_work(font_download_work),
+				struct lg4946_data, font_download_work);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	struct ext_watch_font_header *fonthdr = NULL;
 	int ret = 0;
@@ -483,8 +526,6 @@ void sw49407_font_download(struct work_struct *font_download_work)
 	int rwsize = 0;
 	int idx = 0;
 	int value = 1;
-	u32 status = 0;
-	int retry = 0;
 
 	if (atomic_read(&d->watch.state.font_status) == FONT_EMPTY) {
 		TOUCH_I("%s : data not downloaded\n", __func__);
@@ -503,14 +544,10 @@ void sw49407_font_download(struct work_struct *font_download_work)
 	if (d->lcd_mode == LCD_MODE_U2) {
 		d->watch.ext_wdata.time.disp_waton = 0;
 		ret = ext_watch_display_onoff(d->dev, 1);
-		TOUCH_I("U2 Mode : Watch Display off\n");
+		ret = lg4946_reg_write(ts->dev, EXT_WATCH_MEM_CTRL,
+			(u8*)&value, sizeof(u32));
+		TOUCH_I("U2 Mode : Watch Display off, Memory clk on\n");
 	}
-
-	ret = sw49407_reg_write(ts->dev, EXT_WATCH_FONT_DN_FLAG,
-		(u8*)&value, sizeof(u32));
-	TOUCH_I("Watch Font download flag on\n");
-	if (ret)
-		goto error;
 
 	fonthdr = (struct ext_watch_font_header *)d->watch.ext_wdata.font_data;
 	TOUCH_I("\tMagic[%08X], id[%d], size[%d]\n",
@@ -518,86 +555,79 @@ void sw49407_font_download(struct work_struct *font_download_work)
 	TOUCH_I("\twidth_num[%d], width_colon[%d], height[%d]\n",
 		fonthdr->width_num, fonthdr->width_colon, fonthdr->height);
 
-	while(1){
-		idx = 0;
-		offset = 0;
-		remained = d->watch.font_written_size;
+	memcpy((u8 *)&d->watch.ext_wdata.font_crc,
+		(u8 *)&d->watch.ext_wdata.font_data[sizeof(struct ext_watch_font_header) +
+		fonthdr->size], sizeof(u32));
+	TOUCH_I("\tInput CRC = %08X\n", d->watch.ext_wdata.font_crc);
 
-		while(1) {
-			if (remained > MAX_RW_SIZE) {
-				rwsize = MAX_RW_SIZE;
-				remained -= MAX_RW_SIZE;
-			} else {
-				rwsize = remained;
-				remained = 0;
-			}
+	d->watch.ext_wdata.font_crc =
+		lg4946_font_crc_cal(d->watch.ext_wdata.font_data, fonthdr->size);
 
-			ret = sw49407_reg_write(ts->dev, EXT_WATCH_FONT_OFFSET,
-				(u8*)&offset, sizeof(u32));
-			if (ret)
-				goto error;
+	TOUCH_I("\tCalculated CRC = %08X\n", d->watch.ext_wdata.font_crc);
 
-			ret = sw49407_reg_write(ts->dev, EXT_WATCH_FONT_ADDR,
-				(u8 *)&d->watch.ext_wdata.font_data[idx], rwsize);
-			if (ret)
-				goto error;
-
-			idx += rwsize;
-			offset = (idx / 4);
-
-			if (remained == 0)
-				break;
-		}
-
-		ret = sw49407_reg_write(ts->dev, EXT_WATCH_FONT_CRC_TEST,
-			(u8 *)&value, sizeof(u32));
-		if (ret)
-			goto error;
-
-		touch_msleep(10);
-
-		ret = sw49407_reg_read(ts->dev, tc_status, &status, sizeof(u32));
-		if (ret)
-			goto error;
-
-		if ((status >> 8) & 0x1) {
-			TOUCH_I("%s : retry = %d crc ok\n", __func__, retry);
-			break;
-		} else {
-			TOUCH_I("%s : retry = %d crc fail [tc_status %08X]\n", __func__, retry, status);
-			if(++retry == 3)
-				goto error;
-		}
+	if (d->watch.font_written_size ==
+		sizeof(struct ext_watch_font_header) + fonthdr->size) {
+		d->watch.font_written_size += sizeof(d->watch.ext_wdata.font_crc);
 	}
+
+	memcpy((u8 *)&d->watch.ext_wdata.font_data[
+		sizeof(struct ext_watch_font_header) + fonthdr->size],
+		(u8 *)&d->watch.ext_wdata.font_crc, sizeof(u32));
+
+	remained = d->watch.font_written_size;
+
+	while(1) {
+		if (remained > MAX_RW_SIZE) {
+			rwsize = MAX_RW_SIZE;
+			remained -= MAX_RW_SIZE;
+		} else {
+			rwsize = remained;
+			remained = 0;
+		}
+
+		ret = lg4946_reg_write(ts->dev, EXT_WATCH_FONT_OFFSET,
+			(u8*)&offset, sizeof(u32));
+		if (ret)
+			goto error;
+
+		ret = lg4946_reg_write(ts->dev, EXT_WATCH_FONT_ADDR,
+			(u8 *)&d->watch.ext_wdata.font_data[idx], rwsize);
+		if (ret)
+			goto error;
+
+		idx += rwsize;
+		offset = (idx / 4);
+
+		if (remained == 0)
+			break;
+	}
+
+	ret = lg4946_reg_write(ts->dev, EXT_WATCH_FONT_CRC,
+		(u8 *)&value, sizeof(u32));
+
 	atomic_set(&d->watch.state.font_status, FONT_READY);
 
-	value = 0;
-	ret = sw49407_reg_write(ts->dev, EXT_WATCH_FONT_DN_FLAG,
-		(u8*)&value, sizeof(u32));
-	TOUCH_I("Watch Font download flag off\n");
-	if (ret)
-		goto error;
+	if (d->lcd_mode == LCD_MODE_U2) {
+		value = 0;
+		ret = lg4946_reg_write(ts->dev, EXT_WATCH_MEM_CTRL,
+			(u8*)&value, sizeof(u32));
+		TOUCH_I("U2 Mode : Watch Memory clk off\n");
+	}
 
 	TOUCH_I("%s %d bytes done\n", __func__, d->watch.font_written_size);
 	mutex_unlock(&ts->lock);
 	return;
 
 error:
-	value = 0;
-	ret = sw49407_reg_write(ts->dev, EXT_WATCH_FONT_DN_FLAG,
-		(u8*)&value, sizeof(u32));
-	TOUCH_I(" Watch Font download flag off\n");
-
-	atomic_set(&d->watch.state.font_status, FONT_ERROR);
+	atomic_set(&d->watch.state.font_status, FONT_EMPTY);
 	TOUCH_I("%s fail %d\n", __func__, ret);
-	mutex_unlock(&ts->lock);
 	return;
 }
 
-int sw49407_check_font_status(struct device *dev)
+int lg4946_check_font_status(struct device *dev)
 {
 	struct touch_core_data *ts = to_touch_core(dev);
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int ret = 0;
 	int status = 1;
 
@@ -613,7 +643,7 @@ int sw49407_check_font_status(struct device *dev)
 			return 0;
 	}
 
-	sw49407_reg_read(dev, tc_status, &status, sizeof(int));
+	lg4946_reg_read(dev, tc_status, &status, sizeof(int));
 	if ((status >> 8) & 0x1) {
 		TOUCH_I("%s : crc ok\n", __func__);
 		return 0;
@@ -621,28 +651,29 @@ int sw49407_check_font_status(struct device *dev)
 		TOUCH_I("%s : crc fail [tc_status %08X]\n", __func__, status);
 		mod_delayed_work(ts->wq, &d->font_download_work, 0);
 	}
+
 	return ret;
 }
 
 static int ext_watch_font_dump(struct device *dev, char *font_dump)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	int ret = 0;
-	u32 value = 0;
 	int remained = 0;
 	u32 offset = 0;
 	int rwsize = 0;
 	int idx = 0;
+	int value = 1;
 
 	mutex_lock(&ts->lock);
 	TOUCH_I("%s start\n", __func__);
 
-    value = 1;
-    ret = sw49407_reg_write(dev, EXT_WATCH_FONT_DN_FLAG,
-        (u8*)&value, sizeof(u32));
-    if (ret)
-        goto error;
+	if (d->lcd_mode == LCD_MODE_U2) {
+		ret = lg4946_reg_write(ts->dev, EXT_WATCH_MEM_CTRL,
+			(u8*)&value, sizeof(u32));
+		TOUCH_I("U2 Mode : Watch Memory clk on\n");
+	}
 
 	remained = d->watch.font_written_size;
 
@@ -655,12 +686,12 @@ static int ext_watch_font_dump(struct device *dev, char *font_dump)
 			remained = 0;
 		}
 
-		ret = sw49407_reg_write(dev, EXT_WATCH_FONT_OFFSET,
+		ret = lg4946_reg_write(dev, EXT_WATCH_FONT_OFFSET,
 			(u8*)&offset, sizeof(u32));
 		if (ret)
 			goto error;
 
-		ret = sw49407_reg_read(dev, EXT_WATCH_FONT_ADDR,
+		ret = lg4946_reg_read(dev, EXT_WATCH_FONT_ADDR,
 			(u8 *)&font_dump[idx], rwsize);
 		if (ret)
 			goto error;
@@ -672,20 +703,18 @@ static int ext_watch_font_dump(struct device *dev, char *font_dump)
 			break;
 	}
 
-	value = 0;
-	ret = sw49407_reg_write(dev, EXT_WATCH_FONT_DN_FLAG,
-	(u8*)&value, sizeof(u32));
+	TOUCH_I("%s done\n", __func__);
 
-	if (ret)
-		goto error;
-	TOUCH_I("%s %d bytes done\n", __func__, d->watch.font_written_size);
+	if (d->lcd_mode == LCD_MODE_U2) {
+		value = 0;
+		ret = lg4946_reg_write(ts->dev, EXT_WATCH_MEM_CTRL,
+			(u8*)&value, sizeof(u32));
+		TOUCH_I("U2 Mode : Watch Memory clk off\n");
+	}
 	mutex_unlock(&ts->lock);
 	return ret;
 
 error:
-	value = 0;
-	sw49407_reg_write(dev, EXT_WATCH_FONT_DN_FLAG,
-	(u8*)&value, sizeof(u32));
 	TOUCH_I("%s fail %d\n", __func__, ret);
 	mutex_unlock(&ts->lock);
 	return -EIO;
@@ -693,13 +722,12 @@ error:
 
 static int ext_watch_set_cfg(struct device *dev, char log)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int ret = 0;
 
 	TOUCH_TRACE();
 
-	d->watch.ext_wdata.mode.alpha_fg = 1; /* bypass foreground */
-
+	d->watch.ext_wdata.mode.watch_ctrl.alpha = 1; /* bypass foreground */
 	ret = ext_watch_set_mode(dev, log);
 	if (ret)
 		goto error;
@@ -717,7 +745,7 @@ error:
 
 static int ext_watch_get_dic_st(struct device *dev, char *buf, int *len)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	u32 dic_status = 0;
 	u32 watch_status = 0;
@@ -727,9 +755,9 @@ static int ext_watch_get_dic_st(struct device *dev, char *buf, int *len)
 
 	TOUCH_TRACE();
 
-	sw49407_xfer_msg_ready(dev, 2);
+	lg4946_xfer_msg_ready(dev, 2);
 
-	ts->xfer->data[0].rx.addr = spr_subdisp_st;
+	ts->xfer->data[0].rx.addr = SYS_DISPMODE_STATUS;
 	ts->xfer->data[0].rx.buf = (u8 *)&dic_status;
 	ts->xfer->data[0].rx.size = sizeof(u32);
 
@@ -737,7 +765,7 @@ static int ext_watch_get_dic_st(struct device *dev, char *buf, int *len)
 	ts->xfer->data[1].rx.buf = (u8 *)&watch_status;
 	ts->xfer->data[1].rx.size = sizeof(u32);
 
-	ret = sw49407_xfer_msg(dev, ts->xfer);
+	ret = lg4946_xfer_msg(dev, ts->xfer);
 	if (ret)
 		goto error;
 
@@ -760,7 +788,7 @@ error:
 static ssize_t store_extwatch_fontonoff
 	(struct device *dev, const char *buf, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(dev);
 	u8 value;
 	u8 zero = '0';
@@ -782,13 +810,8 @@ static ssize_t store_extwatch_fontonoff
 
 	d->watch.ext_wdata.time.disp_waton = value;
 
-	if ((d->lcd_mode == LCD_MODE_U2_UNBLANK && value)
-		|| (d->lcd_mode == LCD_MODE_U0 && value)
-		|| (atomic_read(&d->global_reset) == GLOBAL_RESET_START)) {
-		TOUCH_I("%s : Ignore HW Clock On in %s\n", __func__,
-			atomic_read(&d->global_reset) == GLOBAL_RESET_START
-			? "GLOBAL Reset" : d->lcd_mode == LCD_MODE_U0
-			? "U0" : "U2 Unblank");
+	if (d->lcd_mode == LCD_MODE_U2_UNBLANK && value) {
+		TOUCH_I("%s : Ignore HW Clock On in U2 Unblank\n", __func__);
 		goto Exit;
 	}
 
@@ -811,7 +834,7 @@ Exit :
 static ssize_t store_block_cfg(struct device *dev,
 		const char *buf, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	u8 value;
 	u8 zero = '0';
 
@@ -832,7 +855,7 @@ static ssize_t store_block_cfg(struct device *dev,
 static ssize_t show_block_cfg(struct device *dev,
 	char *buf)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int ret = 0;
 
 	ret = snprintf(buf, PAGE_SIZE, "block_watch_cfg : %d\n",
@@ -875,10 +898,10 @@ static ssize_t show_extwatch_fontdata_query
 	struct ExtWatchFontDataQuery query;
 
 	query.Font_supported = SUPPORT;
-	query.max_font_x_size = 66;
-	query.max_font_y_size = 160;
-	query.max_cln_x_size = 24;
-	query.max_cln_y_size = 160;
+	query.max_font_x_size = 255;
+	query.max_font_y_size = 184;
+	query.max_cln_x_size = 255;
+	query.max_cln_y_size = 48;
 
 	memcpy(buf, (char *)&query, sizeof(struct ExtWatchFontDataQuery));
 	return sizeof(struct ExtWatchFontDataQuery);
@@ -940,7 +963,7 @@ static ssize_t show_extwatch_fonteffect_query
 static ssize_t show_extwatch_current_time
 	(struct device *dev, char *buf)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int len = 0;
 
 	TOUCH_TRACE();
@@ -956,7 +979,7 @@ static ssize_t show_extwatch_current_time
 static ssize_t store_extwatch_fonteffect_config(struct device *dev,
 		const char *buf, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct ExtWatchFontEffectConfig cfg;
 	char period[8] = {0};
 
@@ -973,10 +996,8 @@ static ssize_t store_extwatch_fonteffect_config(struct device *dev,
 	d->watch.ext_wdata.position.midnight_hour_zero_en
 		= cfg.midnight_hour_zero_en;
 	d->watch.ext_wdata.position.bhprd = cfg.blink.blink_type;
-	d->watch.ext_wdata.mode.blink_x_start_7to0 = cfg.blink.bstartx & 0xFF;
-	d->watch.ext_wdata.mode.blink_x_start_11to8 = (cfg.blink.bstartx >> 8) & 0xF;
-	d->watch.ext_wdata.mode.blink_x_end_3to0 = cfg.blink.bendx & 0xF;
-	d->watch.ext_wdata.mode.blink_x_end_11to4 = (cfg.blink.bendx >> 4) & 0xFF;
+	d->watch.ext_wdata.mode.blink_area.bstartx = cfg.blink.bstartx;
+	d->watch.ext_wdata.mode.blink_area.bendx = cfg.blink.bendx;
 
 	switch (cfg.blink.blink_type) {
 	default:
@@ -984,25 +1005,13 @@ static ssize_t store_extwatch_fonteffect_config(struct device *dev,
 		snprintf(period, 8, "Off");
 		break;
 	case 1:
-		snprintf(period, 8, "0.125s");
+		snprintf(period, 8, "0.5 sec");
 		break;
 	case 2:
-		snprintf(period, 8, "0.25s");
+		snprintf(period, 8, "1 sec");
 		break;
 	case 3:
-		snprintf(period, 8, "0.5s");
-		break;
-	case 4:
-		snprintf(period, 8, "1s");
-		break;
-	case 5:
-		snprintf(period, 8, "2s");
-		break;
-	case 6:
-		snprintf(period, 8, "4s");
-		break;
-	case 7:
-		snprintf(period, 8, "8s");
+		snprintf(period, 8, "2 sec");
 		break;
 	}
 
@@ -1019,7 +1028,7 @@ static ssize_t store_extwatch_fonteffect_config(struct device *dev,
 static ssize_t store_extwatch_fontproperty_config
 	(struct device *dev, const char *buf, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct ExtWatchFontPropertyConfig cfg;
 	int idx = 0;
 	char log[256] = {0};
@@ -1036,9 +1045,9 @@ static ssize_t store_extwatch_fontproperty_config
 		__func__, (int)cfg.max_num);
 
 	for (idx = 0; idx < (int)cfg.max_num; idx++) {
-		d->watch.ext_wdata.lut.lut[idx].b = cfg.LUT[idx].RGB_blue;
-		d->watch.ext_wdata.lut.lut[idx].g = cfg.LUT[idx].RGB_green;
-		d->watch.ext_wdata.lut.lut[idx].r = cfg.LUT[idx].RGB_red;
+		d->watch.ext_wdata.mode.lut[idx].b = cfg.LUT[idx].RGB_blue;
+		d->watch.ext_wdata.mode.lut[idx].g = cfg.LUT[idx].RGB_green;
+		d->watch.ext_wdata.mode.lut[idx].r = cfg.LUT[idx].RGB_red;
 
 		len += snprintf(log + len, 256 - len, "%d:%02X%02X%02X ", idx + 1,
 			cfg.LUT[idx].RGB_blue, cfg.LUT[idx].RGB_green,
@@ -1053,9 +1062,8 @@ static ssize_t store_extwatch_fontproperty_config
 static ssize_t store_extwatch_fontposition_config(struct device *dev,
 		const char *buf, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct ExtWatchFontPostionConfig cfg;
-	u32 pos_shift;
 
 	if (atomic_read(&d->block_watch_cfg) == BLOCKED) {
 		TOUCH_I("%s : blocked\n", __func__);
@@ -1064,40 +1072,16 @@ static ssize_t store_extwatch_fontposition_config(struct device *dev,
 
 	memcpy((char *)&cfg, buf, sizeof(struct ExtWatchFontPostionConfig));
 
-	if(cfg.watstartx%3!=0) {
-		cfg.watstartx+=3-(cfg.watstartx%3);
-		TOUCH_I("\t%s : watch start x changed[%d]\n",__func__, cfg.watstartx);
-	}
-
-	if(cfg.watendx%3!=0) {
-		cfg.watendx+=3-(cfg.watendx%3);
-		TOUCH_I("\t%s : watch end x changed[%d]\n",__func__, cfg.watendx);
-	}
-
-	if(cfg.watstartx > EXT_WATCH_MAX_STARTX) {
-		pos_shift = cfg.watstartx - EXT_WATCH_MAX_STARTX;
-		cfg.watstartx = EXT_WATCH_MAX_STARTX;
-		cfg.h10x_pos += pos_shift;
-		cfg.h1x_pos += pos_shift;
-		cfg.clx_pos += pos_shift;
-		cfg.m10x_pos += pos_shift;
-		cfg.m1x_pos += pos_shift;
-		TOUCH_I("\t%s : watch position shift[%d]\n",__func__, pos_shift);
-	}
-
-	d->watch.ext_wdata.mode.watch_x_start_7to0 = cfg.watstartx & 0xFF;
-	d->watch.ext_wdata.mode.watch_x_start_11to8 = (cfg.watstartx >> 8) & 0xF;
-	d->watch.ext_wdata.mode.watch_x_end_3to0 = cfg.watendx & 0xF;
-	d->watch.ext_wdata.mode.watch_x_end_11to4 = (cfg.watendx >> 4) & 0xFF;
-	d->watch.ext_wdata.mode.watch_y_start_7to0 = cfg.watstarty & 0xFF;
-	d->watch.ext_wdata.mode.watch_y_start_11to8 = (cfg.watstarty >> 8) & 0xF;
-	d->watch.ext_wdata.mode.watch_y_end_3to0 = cfg.watendy & 0xF;
-	d->watch.ext_wdata.mode.watch_y_end_11to4 = (cfg.watendy >> 4) & 0xFF;
+	d->watch.ext_wdata.mode.watch_area_x.watstart = cfg.watstartx;
+	d->watch.ext_wdata.mode.watch_area_x.watend = cfg.watendx;
+	d->watch.ext_wdata.mode.watch_area_y.watstart = cfg.watstarty;
+	d->watch.ext_wdata.mode.watch_area_y.watend = cfg.watendy;
 	d->watch.ext_wdata.position.h10x_pos = cfg.h10x_pos;
 	d->watch.ext_wdata.position.h1x_pos = cfg.h1x_pos;
 	d->watch.ext_wdata.position.m10x_pos = cfg.m10x_pos;
 	d->watch.ext_wdata.position.m1x_pos = cfg.m1x_pos;
 	d->watch.ext_wdata.position.clx_pos = cfg.clx_pos;
+
 
 	TOUCH_I("%s : Watch area X[%d , %d] Y[%d , %d] position [%d %d %d %d %d]\n",
 		__func__, cfg.watstartx, cfg.watendx, cfg.watstarty, cfg.watendy, cfg.h10x_pos,
@@ -1109,7 +1093,7 @@ static ssize_t store_extwatch_fontposition_config(struct device *dev,
 static ssize_t store_extwatch_timesync_config(struct device *dev,
 		const char *buf, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	struct touch_core_data *ts = to_touch_core(dev);
 	struct ExtWatchTimeSyncConfig cfg;
 	int ret = 0;
@@ -1206,7 +1190,7 @@ static const struct attribute_group watch_attribute_group = {
 static ssize_t watch_attr_show(struct kobject *kobj,
 		struct attribute *attr, char *buf)
 {
-	struct sw49407_data *d = container_of(kobj, struct sw49407_data, kobj);
+	struct lg4946_data *d = container_of(kobj, struct lg4946_data, kobj);
 	struct touch_attribute *priv =
 			container_of(attr, struct touch_attribute, attr);
 	ssize_t ret = 0;
@@ -1220,7 +1204,7 @@ static ssize_t watch_attr_show(struct kobject *kobj,
 static ssize_t watch_attr_store(struct kobject *kobj,
 		struct attribute *attr, const char *buf, size_t count)
 {
-	struct sw49407_data *d = container_of(kobj, struct sw49407_data, kobj);
+	struct lg4946_data *d = container_of(kobj, struct lg4946_data, kobj);
 	struct touch_attribute *priv =
 			container_of(attr, struct touch_attribute, attr);
 	ssize_t ret = 0;
@@ -1243,7 +1227,7 @@ static struct kobj_type watch_kobj_type = {
 static ssize_t watch_access_read(struct file *filp, struct kobject *kobj,
 	struct bin_attribute *bin_attr, char *buf, loff_t off, size_t count)
 {
-	struct sw49407_data *d = container_of(kobj, struct sw49407_data, kobj);
+	struct lg4946_data *d = container_of(kobj, struct lg4946_data, kobj);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	ssize_t retval = -EFAULT;
 
@@ -1277,7 +1261,7 @@ static ssize_t watch_access_read(struct file *filp, struct kobject *kobj,
 static ssize_t watch_access_write(struct file *filp, struct kobject *kobj,
 	struct bin_attribute *bin_attr, char *buf, loff_t off, size_t count)
 {
-	struct sw49407_data *d = to_sw49407_data_from_kobj(kobj);
+	struct lg4946_data *d = to_lg4946_data_from_kobj(kobj);
 	struct touch_core_data *ts = to_touch_core(d->dev);
 	ssize_t retval = -EFAULT;
 
@@ -1312,15 +1296,14 @@ static ssize_t watch_access_write(struct file *filp, struct kobject *kobj,
 		atomic_set(&d->watch.state.font_status, FONT_DOWNLOADING);
 		memcpy(&d->watch.ext_wdata.font_data[off], buf, count);
 		retval = count;
-		TOUCH_I("%s size offset[%d] size[%d]\n", __func__,
-				(int)off, (int)count);
+		d->watch.font_written_size = off + retval;
 		mod_delayed_work(ts->wq, &d->font_download_work, 20);
 	}
 finish:
 	return retval;
 }
 
-static int watch_fontdata_attr_init(struct sw49407_data *d)
+static int watch_fontdata_attr_init(struct lg4946_data *d)
 {
 	d->watch.font_written_size = 0;
 	d->watch.ext_wdata.font_data = kzalloc(MAX_FONT_SIZE, GFP_KERNEL);
@@ -1345,10 +1328,10 @@ static int watch_fontdata_attr_init(struct sw49407_data *d)
 	return 0;
 }
 
-int sw49407_watch_register_sysfs(struct device *dev)
+int lg4946_watch_register_sysfs(struct device *dev)
 {
 	struct touch_core_data *ts = to_touch_core(dev);
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int ret = 0;
 
 	TOUCH_TRACE();
@@ -1368,9 +1351,9 @@ int sw49407_watch_register_sysfs(struct device *dev)
 	return ret;
 }
 
-int sw49407_watch_init(struct device *dev)
+int lg4946_watch_init(struct device *dev)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	int ret = 0;
 
 	if (touch_boot_mode_check(dev) >= MINIOS_MFTS_FOLDER)
@@ -1392,9 +1375,9 @@ int sw49407_watch_init(struct device *dev)
 	return ret;
 }
 
-void sw49407_watch_remove(struct device *dev)
+void lg4946_watch_remove(struct device *dev)
 {
-	struct sw49407_data *d = to_sw49407_data(dev);
+	struct lg4946_data *d = to_lg4946_data(dev);
 	kfree(d->watch.ext_wdata.font_data);
 }
 
