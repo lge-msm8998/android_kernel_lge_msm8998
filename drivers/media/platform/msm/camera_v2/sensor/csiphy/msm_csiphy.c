@@ -621,6 +621,13 @@ static int msm_csiphy_2phase_lane_config(
 			mipi_csiphy_3ph_cmn_ctrl0.addr);
 	}
 	msm_csiphy_cphy_irq_config(csiphy_dev, csiphy_params);
+
+#ifdef CONFIG_ARCH_MSM8996 //def CONFIG_MACH_LGE
+	msm_camera_io_w(0x50, csiphybase+0x10);
+	msm_camera_io_w(0x50, csiphybase+0x210);
+	msm_camera_io_w(0x50, csiphybase+0x710);
+#endif
+
 	return 0;
 }
 

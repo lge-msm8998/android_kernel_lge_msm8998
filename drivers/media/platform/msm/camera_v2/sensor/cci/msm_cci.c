@@ -121,6 +121,10 @@ static int32_t msm_cci_set_clk_param(struct cci_device *cci_dev,
 	enum cci_i2c_master_t master = c_ctrl->cci_info->cci_i2c_master;
 	enum i2c_freq_mode_t i2c_freq_mode = c_ctrl->cci_info->i2c_freq_mode;
 
+#if !defined (CONFIG_MACH_MSM8996_LUCYE) || !defined (CONFIG_ARCH_MSM8998)
+	i2c_freq_mode = I2C_FAST_MODE;
+#endif
+
 	if ((i2c_freq_mode >= I2C_MAX_MODES) || (i2c_freq_mode < 0)) {
 		pr_err("%s:%d invalid i2c_freq_mode = %d",
 			__func__, __LINE__, i2c_freq_mode);
@@ -1404,7 +1408,11 @@ static int32_t msm_cci_init(struct v4l2_subdev *sd,
 		cci_dev->cci_pinctrl_status = 1;
 	}
 	rc = msm_camera_request_gpio_table(cci_dev->cci_gpio_tbl,
+#ifdef CONFIG_ARCH_MSM8996
+		cci_dev->cci_gpio_tbl_size, 1, 0); //LG Change
+#else
 		cci_dev->cci_gpio_tbl_size, 1);
+#endif
 	if (cci_dev->cci_pinctrl_status) {
 		ret = pinctrl_select_state(cci_dev->cci_pinctrl.pinctrl,
 				cci_dev->cci_pinctrl.gpio_state_active);
@@ -1561,7 +1569,11 @@ clk_enable_failed:
 				__func__, __LINE__);
 	}
 	msm_camera_request_gpio_table(cci_dev->cci_gpio_tbl,
+#ifdef CONFIG_ARCH_MSM8996
+		cci_dev->cci_gpio_tbl_size, 0, 0); //LG Change
+#else
 		cci_dev->cci_gpio_tbl_size, 0);
+#endif
 request_gpio_failed:
 	cci_dev->ref_count--;
 	if (cam_config_ahb_clk(NULL, 0, CAM_AHB_CLIENT_CCI,
@@ -1617,7 +1629,11 @@ static int32_t msm_cci_release(struct v4l2_subdev *sd)
 	}
 	cci_dev->cci_pinctrl_status = 0;
 	msm_camera_request_gpio_table(cci_dev->cci_gpio_tbl,
+#ifdef CONFIG_ARCH_MSM8996
+		cci_dev->cci_gpio_tbl_size, 0, 0); // LG Change
+#else
 		cci_dev->cci_gpio_tbl_size, 0);
+#endif
 	for (i = 0; i < MASTER_MAX; i++)
 		cci_dev->i2c_freq_mode[i] = I2C_MAX_MODES;
 	cci_dev->cci_state = CCI_STATE_DISABLED;
@@ -1706,7 +1722,7 @@ static int32_t msm_cci_config(struct v4l2_subdev *sd,
 	struct msm_camera_cci_ctrl *cci_ctrl)
 {
 	int32_t rc = 0;
-#ifdef CONFIG_MACH_LGE
+#ifdef CONFIG_ARCH_MSM8998
 	struct cci_device *cci_dev = v4l2_get_subdevdata(sd);
 #endif
 
@@ -1737,7 +1753,7 @@ static int32_t msm_cci_config(struct v4l2_subdev *sd,
 #endif
 		break;
 	case MSM_CCI_I2C_READ:
-#ifndef CONFIG_MACH_LGE
+#ifndef CONFIG_ARCH_MSM8998
 		rc = msm_cci_i2c_read_bytes(sd, cci_ctrl);
 #else
 		mutex_lock(&cci_dev->op_lock);
@@ -1750,7 +1766,7 @@ static int32_t msm_cci_config(struct v4l2_subdev *sd,
 	case MSM_CCI_I2C_WRITE_SYNC:
 	case MSM_CCI_I2C_WRITE_ASYNC:
 	case MSM_CCI_I2C_WRITE_SYNC_BLOCK:
-#ifndef CONFIG_MACH_LGE
+#ifndef CONFIG_ARCH_MSM8998
 		rc = msm_cci_write(sd, cci_ctrl);
 #else
 		mutex_lock(&cci_dev->op_lock);

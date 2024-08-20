@@ -122,6 +122,15 @@ config MSM_ISPIF_V2
           of any CID of CSID can be routed to of pixel
           or raw data interface in VFE.
 
+config IMX234
+        bool "Sensor IMX234 (BAYER 16M)"
+        depends on MSMB_CAMERA
+        ---help---
+                Sony 16 MP Bayer Sensor with auto focus, uses
+                4 mipi lanes full resolution @30fps and
+                HFR @60fps and @120fps,
+                Video HDR support.
+
 config IMX134
 	bool "Sensor IMX134 (BAYER 8M)"
 	depends on MSMB_CAMERA
@@ -254,8 +263,27 @@ config MSM_SEC_CCI_DEBUG
 	  Enables simulation of secure camera for Secure CCI Realy
 	  debugging.
 
+config LG_TCS
+        bool "Qualcomm MSM camera TCS support"
+        depends on MSMB_CAMERA
+        ---help---
+        Enable support for true color sensor for msm camera.
+
+config LGE_EEPROM
+	bool "LG Camera EEPROM Support"
+	depends on MSM_EEPROM
+    ---help---
+      This flag enables support for LG Camera
+
 config LG_PROXY
 	bool "Qualcomm MSM camera proxy support"
 	depends on MSMB_CAMERA
 	---help---
 	  Enable support for proxy sensor for msm camera.
+
+config LC898123F40
+	bool "OIS/AF Controller & Driver"
+	---help---
+	LC898123F40XC is a system LSI integrating an onchip 32bit DSP, a Flash Memory and peripherals including
+	analog circuits for OIS(Optical Image Stabilization) /AF(Auto Focus) control and H-bridge and linear
+	drivers.

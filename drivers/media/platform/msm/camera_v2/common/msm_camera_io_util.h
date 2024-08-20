@@ -69,8 +69,13 @@ void msm_camera_config_single_gpio(uint16_t gpio, unsigned long flags,
 int msm_camera_config_single_vreg(struct device *dev,
 	struct camera_vreg_t *cam_vreg, struct regulator **reg_ptr, int config);
 
+#ifdef CONFIG_ARCH_MSM8996
+int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
+	int gpio_en, int dual_camera) //LG Change
+#else
 int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
 	int gpio_en);
+#endif
 void msm_camera_io_dump_wstring_base(void __iomem *addr,
 	struct msm_cam_dump_string_info *dump_data,
 	int size);

@@ -165,6 +165,68 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 				}
 			}
 			break;
+		case CAM_OISVDD:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "cam_oisvdd")) {
+					pr_err("%s:%d i %d j %d cam_oisvdd\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					break;
+				}
+			}
+			break;
+
+		case CAM_OISDVDD:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "cam_oisdvdd")) {
+					pr_err("%s:%d i %d j %d cam_oisdvdd\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					break;
+				}
+			}
+			break;
+
+		case CAM_I2C_PULL_UP:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "cam_vi2c")) {
+					pr_err("%s:%d i %d j %d cam_vi2c\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					break;
+				}
+			}
+			break;
+
+		case CAM_TCS_VIO:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "tcs_vio")) {
+					pr_err("%s:%d i %d j %d tcs_vio\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					break;
+				}
+			}
+			break;
+
+		case CAM_IRIS_VDD:
+			for (j = 0; j < num_vreg; j++) {
+				if (!strcmp(cam_vreg[j].reg_name, "cam_iris_vdd")) {
+					CDBG("%s:%d i %d j %d cam_iris_vdd\n",
+						__func__, __LINE__, i, j);
+					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
+					break;
+				}
+			}
+			break;
 
 		default:
 			pr_err("%s:%d invalid seq_val %d\n", __func__,
@@ -226,6 +288,40 @@ int msm_sensor_get_sub_module_index(struct device_node *of_node,
 		of_node_put(src_node);
 		src_node = NULL;
 	}
+
+#ifdef CONFIG_MACH_LGE
+	src_node = of_parse_phandle(of_node, "qcom,tcs-src", 0);
+	if (!src_node) {
+		pr_err("%s:%d src_node NULL\n", __func__, __LINE__);
+	} else {
+		rc = of_property_read_u32(src_node, "cell-index", &val);
+		pr_err("%s qcom,tcs cell index %d, rc %d\n", __func__,
+			val, rc);
+		if (rc < 0) {
+			pr_err("%s failed %d\n", __func__, __LINE__);
+			goto ERROR;
+		}
+		sensor_info->subdev_id[SUB_MODULE_TCS] = val;
+		of_node_put(src_node);
+		src_node = NULL;
+	}
+
+	src_node = of_parse_phandle(of_node, "qcom,proxy-src", 0);
+	if (!src_node) {
+		CDBG("%s:%d src_node NULL\n", __func__, __LINE__);
+	} else {
+		rc = of_property_read_u32(src_node, "cell-index", &val);
+		CDBG("%s qcom,proxy cell index %d, rc %d\n", __func__,
+			val, rc);
+		if (rc < 0) {
+			pr_err("%s failed %d\n", __func__, __LINE__);
+			goto ERROR;
+		}
+		sensor_info->subdev_id[SUB_MODULE_PROXY] = val;
+		of_node_put(src_node);
+		src_node = NULL;
+	}
+#endif
 
 	src_node = of_parse_phandle(of_node, "qcom,eeprom-src", 0);
 	if (!src_node) {
@@ -493,8 +589,15 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 
 	CDBG("%s qcom,cam-power-seq-type count %d\n", __func__, count);
 
+#if 0 //ndef CONFIG_MACH_LGE
 	if (count <= 0)
 		return 0;
+#else
+	if (count <= 0) {
+		*power_setting_size = 0;
+		return 0;
+	}
+#endif
 
 	ps = kzalloc(sizeof(*ps) * count, GFP_KERNEL);
 	if (!ps) {
@@ -581,6 +684,10 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 #ifdef CONFIG_MACH_LGE
 			else if (!strcmp(seq_name, "sensor_gpio_ldaf"))
 				ps[i].seq_val = SENSOR_GPIO_LDAF_EN;
+			else if (!strcmp(seq_name, "sensor_gpio_ois_reset"))
+				ps[i].seq_val = SENSOR_GPIO_OIS_RESET;
+			else if (!strcmp(seq_name, "sensor_gpio_tcs_vana"))
+				ps[i].seq_val = SENSOR_GPIO_TCS_VANA;
 #endif
 			else
 				rc = -EILSEQ;
@@ -1145,6 +1252,27 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		gconf->gpio_num_info->valid[SENSOR_GPIO_LDAF_EN] = 1;
 		CDBG("%s qcom,gpio-ldaf-en %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_LDAF_EN]);
+	} else {
+		rc = 0;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,gpio-tcs-vana", &val);
+	if (rc != -EINVAL) {
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-tcs-vana failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-tcs-vana invalid %d\n",
+				__func__, __LINE__, val);
+			rc = -EINVAL;
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_TCS_VANA] =
+			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_TCS_VANA] = 1;
+		CDBG("%s qcom,gpio-tcs-vana %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_TCS_VANA]);
 	} else {
 		rc = 0;
 	}

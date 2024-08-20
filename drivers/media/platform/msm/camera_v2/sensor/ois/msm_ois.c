@@ -20,6 +20,7 @@
 #ifdef CONFIG_MACH_LGE
 #include "msm_ois_i2c.h"
 #include "../msm_sensor.h"
+#include <soc/qcom/lge/board_lge.h>	//to use lge_get_board_revno()
 #endif
 DEFINE_MSM_MUTEX(msm_ois_mutex);
 #if 1//def CONFIG_MACH_LGE
@@ -39,9 +40,42 @@ static int32_t msm_ois_power_up(struct msm_ois_ctrl_t *o_ctrl);
 static int32_t msm_ois_power_down(struct msm_ois_ctrl_t *o_ctrl);
 
 static struct i2c_driver msm_ois_i2c_driver;
+
+#ifdef CONFIG_ARCH_MSM8998
 #define RENESAS_MODULE
-#ifdef CONFIG_MACH_LGE
+#endif
+
+#ifdef CONFIG_ARCH_MSM8996
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
 static struct msm_ois_ctrl_t *local_msm_ois_t;
+uint16_t cal_ver = 0;
+uint16_t map_ver = 0;
+uint16_t eeprom_slave_id = 0;
+#define OIS_MAKER_ID_ADDR	(0xbe0)
+#define CAL_VERSION (0xac2)
+#define MAP_VERSION (0xbe2)
+extern void lgit_imx258_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lgit_imx258_claf_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void imt_imx258_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lc898122a_af_vcm_code(int16_t UsVcmCod);
+#else // not LUCYE
+#define OIS_MAKER_ID_ADDR	(0x700)
+#define EEPROM_SLAVE_ID (0x54) //0xA8 >> 1
+
+#if defined(CONFIG_MACH_MSM8996_ELSA)
+extern void lgit_imx298_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lgit_s5k2p7_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lc898122a_af_vcm_code(int16_t UsVcmCod);
+#define EEPROM_MAP_ADDR (0x770)
+uint16_t map_ver = 0;
+#else // not ELSA
+extern void lgit_imx234_onsemi_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lgit_imx234_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void imtech_imx234_onsemi_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lc898122a_af_vcm_code(int16_t UsVcmCod);
+#endif // CONFIG_MACH_MSM8996_ELSA
+#endif // CONFIG_MACH_MSM8996_LUCYE
+#else // not MSM8996
 uint16_t cal_ver = 0;
 uint16_t map_ver = 0;
 #define EEPROM_SLAVE_ID (0xA8)
@@ -54,7 +88,12 @@ extern int32_t msm_ois_renesas_get_info(struct msm_ois_ctrl_t *o_ctrl, struct ms
 extern int32_t msm_ois_hall_polarity_check(struct msm_ois_ctrl_t *o_ctrl);
 extern int32_t msm_ois_gyro_data_check(struct msm_ois_ctrl_t *o_ctrl);
 extern int32_t msm_ois_gyro_calibration(struct msm_ois_ctrl_t *o_ctrl);
-#endif
+#endif // RENESAS_MODULE
+
+#endif // CONFIG_ARCH_MSM8996
+
+#ifdef CONFIG_MACH_LGE
+static struct msm_ois_ctrl_t *local_msm_ois_t;
 #endif
 
 static int32_t data_type_to_num_bytes(
@@ -397,7 +436,11 @@ static int32_t msm_ois_power_down(struct msm_ois_ctrl_t *o_ctrl)
 				rc = msm_camera_request_gpio_table(
 					o_ctrl->gconf->cam_gpio_req_tbl,
 					o_ctrl->gconf->cam_gpio_req_tbl_size,
+#ifdef CONFIG_ARCH_MSM8996
+					0,0);
+#else
 					0);
+#endif
 				if (rc < 0)
 					pr_err("ERR:%s:Failed in selecting state in ois power down: %d\n",
 						__func__, rc);
@@ -416,6 +459,15 @@ static int msm_ois_init(struct msm_ois_ctrl_t *o_ctrl)
 	int rc = 0;
 	CDBG("Enter\n");
 
+#ifdef CONFIG_ARCH_MSM8996
+	uint16_t chipid = 0;
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
+    int32_t ret = 0;
+#else
+    uint16_t vcm_ver = 0;
+#endif
+#endif
+
 	if (!o_ctrl) {
 		pr_err("failed\n");
 		return -EINVAL;
@@ -428,7 +480,97 @@ static int msm_ois_init(struct msm_ois_ctrl_t *o_ctrl)
 			pr_err("cci_init failed\n");
 	}
 
-#ifdef CONFIG_MACH_LGE
+	#ifdef CONFIG_ARCH_MSM8996
+	#if defined(CONFIG_MACH_MSM8996_LUCYE)
+	o_ctrl->i2c_client.cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
+	ret = ois_i2c_e2p_read(OIS_MAKER_ID_ADDR, &chipid, 1);
+	#else
+	ois_i2c_e2p_read(OIS_MAKER_ID_ADDR, &chipid, 1);
+	#endif
+	switch (chipid)
+	{
+#if	defined(CONFIG_MACH_MSM8996_LUCYE)
+		case 0x01:
+		case 0x02:
+		case 0x05:
+			ois_i2c_e2p_read(MAP_VERSION, &map_ver, 1);
+			rc = ois_i2c_e2p_read(CAL_VERSION, &cal_ver, 2);// for check vcm
+			if(map_ver == 0x01 && cal_ver == 0x02){
+				lgit_imx258_rohm_ois_init(o_ctrl);
+				}else{
+				lgit_imx258_claf_rohm_ois_init(o_ctrl);
+				}
+				local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
+				if (cal_ver != 0x02 && cal_ver != 0x05 && cal_ver != 0x06 && cal_ver != 0x07 && cal_ver != 0x09) {
+				printk("%s: kernel ois not supported, rc(%d) cal_ver(%d) \n", __func__, rc, cal_ver);
+				return OIS_INIT_NOT_SUPPORTED;
+				}
+				printk("%s : LGIT rohm i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
+				break;
+		case 0x14:
+			imt_imx258_rohm_ois_init(o_ctrl);
+			local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
+			rc = ois_i2c_e2p_read(CAL_VERSION, &cal_ver, 2); // for check vcm
+				if (cal_ver != 0x41 && cal_ver != 0x0406 && cal_ver != 0x0507 && cal_ver != 0x0608) {
+				printk("%s: kernel ois not supported, rc(%d) cal_ver(%d) \n", __func__, rc, cal_ver);
+				return OIS_INIT_NOT_SUPPORTED;
+				}
+				printk("%s : IMT rohm i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
+				break;
+#else
+#if	defined(CONFIG_MACH_MSM8996_ELSA)
+		case 0x01:
+		case 0x02:
+		case 0x05:
+			ois_i2c_e2p_read(EEPROM_MAP_ADDR, &map_ver, 1);
+			if(map_ver == 0x03){
+				lgit_s5k2p7_rohm_ois_init(o_ctrl);
+			    rc = ois_i2c_e2p_read(0x88E, &vcm_ver, 2); // for check vcm
+			    }else{
+			    lgit_imx298_rohm_ois_init(o_ctrl);
+				rc = ois_i2c_e2p_read(0x92E, &vcm_ver, 2); // for check vcm
+				}
+				local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
+				if (vcm_ver != 0x01 && vcm_ver != 0x02 && vcm_ver != 0x1D && vcm_ver != 0x16
+					&& vcm_ver != 0x34 && vcm_ver != 0x40 && vcm_ver != 0x41) {
+					printk("%s: kernel ois not supported, rc(%d) vcm_ver(%d) \n", __func__, rc, vcm_ver);
+					return OIS_INIT_NOT_SUPPORTED;
+					}
+				printk("%s : LGIT rohm i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
+				break;
+#else //H1, Anna
+		case 0x01:
+		case 0x02:
+		case 0x05:
+			lgit_imx234_rohm_ois_init(o_ctrl);
+			local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
+			rc = ois_i2c_e2p_read(0x92E, &vcm_ver, 2); // for check vcm
+			if (vcm_ver != 0x01 && vcm_ver != 0x02 && vcm_ver != 0x1D && vcm_ver != 0x16
+				&& vcm_ver != 0x34 && vcm_ver != 0x40 && vcm_ver != 0x41) {
+				printk("%s: kernel ois not supported, rc(%d) vcm_ver(%d) \n", __func__, rc, vcm_ver);
+				return OIS_INIT_NOT_SUPPORTED;
+			}
+			printk("%s : LGIT rohm i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
+			break;
+		case 0x14:
+		case 0x15:
+		case 0x16:
+			imtech_imx234_onsemi_ois_init(o_ctrl);
+			local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
+			printk("%s : imtech onsemi i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
+			break;
+#endif
+		case 0x03:
+			printk("%s : FujiFilm OIS module!\n", __func__);
+			break;
+#endif
+	default:
+		printk("%s : unknown module! maker id = %d\n", __func__, chipid);
+		return -EINVAL;
+	}
+	#endif //CONFIG_LG_OIS
+
+#ifdef CONFIG_ARCH_MSM8998
 	ois_i2c_e2p_read(MAP_VERSION, &map_ver, 1);
 	pr_err("map_ver: 0x%x", map_ver);
 
@@ -542,6 +684,9 @@ static int32_t msm_ois_config(struct msm_ois_ctrl_t *o_ctrl,
 	CDBG("%s type %d\n", __func__, cdata->cfgtype);
 	switch (cdata->cfgtype) {
 	case CFG_OIS_INIT:
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
+		eeprom_slave_id = cdata->eeprom_slave_addr >> 1; //LGE
+#endif
 		rc = msm_ois_init(o_ctrl);
 		if (rc < 0)
 			pr_err("msm_ois_init failed %d\n", rc);
@@ -879,7 +1024,11 @@ static int32_t msm_ois_power_up(struct msm_ois_ctrl_t *o_ctrl)
 			o_ctrl->gconf->gpio_num_info->valid[gpio] == 1) {
 			rc = msm_camera_request_gpio_table(
 				o_ctrl->gconf->cam_gpio_req_tbl,
+#ifdef CONFIG_ARCH_MSM8996
+				o_ctrl->gconf->cam_gpio_req_tbl_size, 1, 0);
+#else
 				o_ctrl->gconf->cam_gpio_req_tbl_size, 1);
+#endif
 			if (rc < 0) {
 				pr_err("ERR:%s:Failed in selecting state for ois: %d\n",
 					__func__, rc);
@@ -1007,6 +1156,10 @@ static long msm_ois_subdev_do_ioctl(
 	sd = vdev_to_v4l2_subdev(vdev);
 	u32 = (struct msm_ois_cfg_data32 *)arg;
 	parg = arg;
+
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
+	ois_data.eeprom_slave_addr = u32->eeprom_slave_addr; //LGE
+#endif
 
 	switch (cmd) {
 	case VIDIOC_MSM_OIS_CFG32:
@@ -1180,7 +1333,14 @@ int32_t ois_i2c_e2p_write(uint16_t addr, uint16_t data, enum msm_camera_i2c_data
 	struct msm_camera_cci_client *cci_client = NULL;
 
 	cci_client = local_msm_ois_t->i2c_eeprom_client.cci_client;
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
+	cci_client->sid = eeprom_slave_id;
+	cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
+#elif defined(CONFIG_ARCH_MSM8998)
 	cci_client->sid = EEPROM_SLAVE_ID >> 1;
+#else
+	cci_client->sid = EEPROM_SLAVE_ID; //0xA0 >> 1;
+#endif
 	cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
 	cci_client->retries = 3;
 	cci_client->id_map = 0;
@@ -1197,7 +1357,14 @@ int32_t ois_i2c_e2p_read(uint16_t addr, uint16_t *data, enum msm_camera_i2c_data
 
 
 	cci_client = local_msm_ois_t->i2c_eeprom_client.cci_client;
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
+	cci_client->sid = eeprom_slave_id;
+	cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
+#elif defined(CONFIG_ARCH_MSM8998)
 	cci_client->sid = EEPROM_SLAVE_ID >> 1;
+#else
+	cci_client->sid = EEPROM_SLAVE_ID; //0xA0 >> 1;
+#endif
 	cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
 	cci_client->retries = 3;
 	cci_client->id_map = 0;
@@ -1214,7 +1381,14 @@ int32_t ois_i2c_e2p_read_seq(uint32_t addr, uint8_t *data, uint32_t num_byte)
 
 
 	cci_client = local_msm_ois_t->i2c_eeprom_client.cci_client;
+#if defined(CONFIG_MACH_MSM8996_LUCYE)
+	cci_client->sid = eeprom_slave_id;
+	cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
+#elif defined(CONFIG_ARCH_MSM8998)
 	cci_client->sid = EEPROM_SLAVE_ID >> 1;
+#else
+	cci_client->sid = EEPROM_SLAVE_ID; //0xA0 >> 1;
+#endif
 	cci_client->i2c_freq_mode = I2C_FAST_PLUS_MODE;
 	cci_client->retries = 3;
 	cci_client->id_map = 0;
