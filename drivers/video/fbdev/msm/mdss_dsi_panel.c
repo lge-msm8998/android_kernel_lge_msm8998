@@ -929,6 +929,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 				mdss_dsi_panel_bklt_dcs(sctrl, bl_level);
 		}
 		break;
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	case BL_OTHERS:
+		lge_set_backlight(bl_level);
+		break;
+#endif
 	default:
 		pr_err("%s: Unknown bl_ctrl configuration\n",
 			__func__);
@@ -2010,6 +2015,7 @@ static void mdss_dsi_parse_dms_config(struct device_node *np,
 			__func__);
 		pinfo->mipi.dms_mode = DYNAMIC_MODE_SWITCH_DISABLED;
 	}
+
 exit:
 	pr_info("%s: dynamic switch feature enabled: %d\n", __func__,
 		pinfo->mipi.dms_mode);
@@ -2507,6 +2513,13 @@ int mdss_panel_parse_bl_settings(struct device_node *np,
 			pr_debug("%s: Configured DCS_CMD bklt ctrl\n",
 								__func__);
 		}
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+		else if (!strcmp(data, "bl_ctrl_lge")) {
+			ctrl_pdata->bklt_ctrl = BL_OTHERS;
+			pr_debug("%s: Configured BL_OTHERS bklt ctrl\n",
+								__func__);
+		}
+#endif
 	}
 	return 0;
 }
@@ -2543,6 +2556,40 @@ int mdss_dsi_panel_timing_switch(struct mdss_dsi_ctrl_pdata *ctrl,
 		pinfo->mipi.dsi_phy_db.timing_8996[i] = pt->phy_timing_8996[i];
 
 	ctrl->on_cmds = pt->on_cmds;
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	ctrl->vcom_cmds = pt->vcom_cmds;
+#endif
+#if defined(CONFIG_LGE_DISPLAY_BL_EXTENDED)
+	ctrl->display_on_cmds = pt -> display_on_cmds;
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED)
+	ctrl->trimming_cmds = pt->trimming_cmds;
+	ctrl->cam_cmds = pt->cam_cmds;
+	ctrl->screen_cmds_102v = pt->screen_cmds_102v;
+	ctrl->screen_cmds_129v = pt->screen_cmds_129v;
+	ctrl->screen_cmds_132v = pt->screen_cmds_132v;
+#endif
+#endif
+#if defined(CONFIG_LGE_ENHANCE_GALLERY_SHARPNESS)
+	ctrl->sharpness_on_cmds = pt->sharpness_on_cmds;
+	ctrl->ce_on_cmds = pt->ce_on_cmds;
+#endif
+#if defined(CONFIG_LGE_LCD_DYNAMIC_CABC_MIE_CTRL)
+	ctrl->ie_on_cmds = pt->ie_on_cmds;
+	ctrl->ie_off_cmds = pt->ie_off_cmds;
+#endif
+#if defined(CONFIG_LGE_DISPLAY_LUCYE_COMMON)
+	ctrl->display_on_cmds= pt->display_on_cmds;
+	ctrl->display_on_and_aod_comds = pt->display_on_and_aod_comds;
+	ctrl->reg_55h_cmds = pt->reg_55h_cmds;
+	ctrl->reg_f0h_cmds = pt->reg_f0h_cmds;
+	ctrl->reg_f2h_cmds = pt->reg_f2h_cmds;
+	ctrl->reg_f3h_cmds = pt->reg_f3h_cmds;
+	ctrl->reg_fbh_cmds = pt->reg_fbh_cmds;
+#endif
+#if defined(CONFIG_LGE_DISPLAY_LINEAR_GAMMA)
+	ctrl->linear_gamma_default_cmds = pt->linear_gamma_default_cmds;
+	ctrl->linear_gamma_tuning_cmds = pt->linear_gamma_tuning_cmds;
+#endif
 	ctrl->post_panel_on_cmds = pt->post_panel_on_cmds;
 
 	ctrl->panel_data.current_timing = timing;
@@ -2685,7 +2732,87 @@ static int  mdss_dsi_panel_config_res_properties(struct device_node *np,
 	mdss_dsi_parse_dcs_cmds(np, &pt->on_cmds,
 		"qcom,mdss-dsi-on-command",
 		"qcom,mdss-dsi-on-command-state");
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	mdss_dsi_parse_dcs_cmds(np, &pt->vcom_cmds,
+		"qcom,mdss-dsi-vcom-command",
+		"qcom,mdss-dsi-on-command-state");
+#endif
+#if defined(CONFIG_LGE_DISPLAY_BL_EXTENDED)
+	mdss_dsi_parse_dcs_cmds(np, &pt->display_on_cmds,
+		"qcom,mdss-display-on-command",
+		"qcom,mdss-dsi-on-command-state");
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED)
+	mdss_dsi_parse_dcs_cmds(np, &pt->trimming_cmds,
+		"qcom,mdss-dsi-trimming-set-command",
+		"qcom,mdss-dsi-trimming-set-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->cam_cmds,
+		"qcom,mdss-dsi-cam-set-command",
+		"qcom,mdss-dsi-cam-set-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->screen_cmds_102v,
+		"qcom,mdss-dsi-screen-command-102v",
+		"qcom,mdss-dsi-screen-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->screen_cmds_129v,
+		"qcom,mdss-dsi-screen-command-129v",
+		"qcom,mdss-dsi-screen-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->screen_cmds_132v,
+		"qcom,mdss-dsi-screen-command-132v",
+		"qcom,mdss-dsi-screen-command-state");
+#endif
+#endif
+#if defined(CONFIG_LGE_ENHANCE_GALLERY_SHARPNESS)
+	mdss_dsi_parse_dcs_cmds(np, &pt->sharpness_on_cmds,
+		"qcom,mdss-dsi-sharpness-on-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->ce_on_cmds,
+		"qcom,mdss-dsi-ce-on-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+#endif
+#if defined(CONFIG_LGE_LCD_DYNAMIC_CABC_MIE_CTRL)
+	mdss_dsi_parse_dcs_cmds(np, &pt->ie_on_cmds,
+		"qcom,mdss-dsi-ie-on-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->ie_off_cmds,
+		"qcom,mdss-dsi-ie-off-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+#endif
+#if defined(CONFIG_LGE_DISPLAY_LUCYE_COMMON)
+	mdss_dsi_parse_dcs_cmds(np, &pt->display_on_cmds,
+		"qcom,mdss-display-on-command",
+		"qcom,mdss-dsi-on-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->display_on_and_aod_comds,
+		"lge,mode-change-cmds-u0-to-u2",
+		"qcom,mdss-dsi-on-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->reg_55h_cmds,
+		"lge,mdss-dsi-55h-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->reg_f0h_cmds,
+		"lge,mdss-dsi-f0h-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->reg_f2h_cmds,
+		"lge,mdss-dsi-f2h-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->reg_f3h_cmds,
+		"lge,mdss-dsi-f3h-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->reg_fbh_cmds,
+		"lge,mdss-dsi-fbh-command",
+		"qcom,mdss-dsi-common-hs-command-state");
 
+	mdss_dsi_parse_dcs_cmds(np, &pt->vgho_vglo_8p8v_cmd,
+		"lge,mdss-dsi-vgho-vglo-8p8v-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->vgho_vglo_11p6v_cmd,
+		"lge,mdss-dsi-vgho-vglo-11p6v-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+#endif
+#if defined(CONFIG_LGE_DISPLAY_LINEAR_GAMMA)
+	mdss_dsi_parse_dcs_cmds(np, &pt->linear_gamma_default_cmds,
+		"qcom,panel-linear-gamma-default-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &pt->linear_gamma_tuning_cmds,
+		"qcom,panel-linear-gamma-tuning-command",
+		"qcom,mdss-dsi-common-hs-command-state");
+#endif
 	mdss_dsi_parse_dcs_cmds(np, &pt->post_panel_on_cmds,
 		"qcom,mdss-dsi-post-panel-on-command", NULL);
 
@@ -3086,6 +3213,46 @@ int mdss_dsi_panel_init(struct device_node *node,
 		}
 		else if (strncmp(panel_name, "SW49408 cmd mode", 16) == 0) {
 			pr_err("[Display] %s: panel_type is LGD_SW49408_CMD_DSC_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIC_LG49408_1440_2880_INCELL_CMD_PANEL;
+		}
+		else if (strncmp(panel_name, "LGD SIC LG4945", 14) == 0) {
+			pr_err("%s: panel_type is LGD_SIC_LG4945_INCELL_CMD_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIC_LG4945_INCELL_CMD_PANEL;
+		}
+		else if (strncmp(panel_name, "LGD SIC LG4946", 14) == 0) {
+			pr_err("%s: panel_type is LGD_SIC_LG4946_INCELL_CMD_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGE_SIC_LG4946_INCELL_CND_PANEL;
+		}
+		else if (strncmp(panel_name, "LGD RSP", 7) == 0) {
+			pr_err("%s: panel_type is LGD_R69007_INCELL_CMD_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_R69007_INCELL_CMD_PANEL;
+		}
+		else if (strncmp(panel_name, "LGD Synaptics", 13)==0) {
+			pr_err("%s: panel_type is LGD_TD4302_INCELL_CMD_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGE_TD4302_INCELL_CND_PANEL;
+		}
+		else if (strncmp(panel_name, "SW49407 cmd mode", 16)==0) {
+			pr_err("%s: panel_type is LGD_SW49407_CMD_DSC_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIC_LG49407_INCELL_CMD_PANEL;
+		}
+		else if (strncmp(panel_name, "SW49407 video mode", 18)==0) {
+			pr_err("%s: panel_type is LGD_SW49407_VIDEO_DSC_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIC_LG49407_INCELL_VIDEO_PANEL;
+		}
+		else if (strncmp(panel_name, "SW49407 1440 2880 video", 23) == 0) {
+			pr_err("%s: panel_type is LGD_SW49407_VIDEO_DSC_PANEL\n",
+					__func__);
+			pinfo->panel_type = LGD_SIC_LG49407_1440_2880_INCELL_VIDEO_PANEL;
+		}
+		else if (strncmp(panel_name, "SW49408 1440 2880 cmd", 21) == 0) {
+			pr_err("%s: panel_type is LGD_SW49408_CMD_DSC_PANEL\n",
 					__func__);
 			pinfo->panel_type = LGD_SIC_LG49408_1440_2880_INCELL_CMD_PANEL;
 		}

@@ -39,12 +39,32 @@
 #include "mdss_hdmi_mhl.h"
 #include "mdss_hdmi_util.h"
 
+#if defined(CONFIG_SLIMPORT_COMMON) || defined(CONFIG_LGE_DP_ANX7688)
+#include <soc/qcom/lge/board_lge.h>
+#endif
+
 #define DRV_NAME "hdmi-tx"
 #define COMPATIBLE_NAME "qcom,hdmi-tx"
 
 #define HDMI_TX_EVT_STR(x) #x
 #define DEFAULT_VIDEO_RESOLUTION HDMI_VFRMT_640x480p60_4_3
 #define DEFAULT_HDMI_PRIMARY_RESOLUTION HDMI_VFRMT_1920x1080p60_16_9
+
+#ifdef CONFIG_SLIMPORT_COMMON
+extern int slimport_read_edid_block(int block, uint8_t *edid_buf);
+#endif
+#ifdef CONFIG_SLIMPORT_CTYPE
+extern bool audio_restart_flag;
+#endif
+#ifdef CONFIG_LGE_DP_ANX7688
+extern void rx_set_cable_type(void);
+extern void sp_rx_cur_info(void);
+extern unchar rx_get_cable_type(void);
+#endif
+
+#ifdef CONFIG_LGE_EXTERNAL_DISPLAY_BLOCK
+static bool blk_state = false;
+#endif
 
 /* HDMI PHY/PLL bit field macros */
 #define SW_RESET BIT(2)
@@ -105,6 +125,9 @@ enum hdmi_tx_hpd_states {
 };
 
 static int hdmi_tx_set_mhl_hpd(struct platform_device *pdev, uint8_t on);
+#ifdef CONFIG_SLIMPORT_DYNAMIC_HPD
+static int hdmi_tx_set_slimport_hpd(struct platform_device *pdev, uint8_t on);
+#endif
 static int hdmi_tx_sysfs_enable_hpd(struct hdmi_tx_ctrl *hdmi_ctrl, int on);
 static irqreturn_t hdmi_tx_isr(int irq, void *data);
 static void hdmi_tx_hpd_off(struct hdmi_tx_ctrl *hdmi_ctrl);

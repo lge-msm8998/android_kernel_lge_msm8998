@@ -39,12 +39,15 @@
 #define CMDLINE_DSI_CTL_NUM_STRING_LEN 2
 
 #if defined(CONFIG_LGE_DISPLAY_COMMON)
-
+#include <linux/mfd/dw8768_dsv.h>
 #include <soc/qcom/lge/board_lge.h>
+#include <linux/regulator/driver.h>
+#include <linux/input/lge_touch_notify.h>
 #include "lge/lge_mdss_display.h"
 
 int panel_not_connected;
 int skip_lcd_error_check;
+int laf_mode_check;
 #endif
 
 #if defined(CONFIG_LGE_DISPLAY_BRIGHTNESS_DIMMING)
@@ -58,6 +61,10 @@ int skip_lcd_error_check;
 #include "lge/lge_display_control.h"
 #endif
 
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED)
+#include <soc/qcom/lge/board_lge.h>
+extern int lge_set_validate_lcd_reg(void);
+#endif
 
 /* Master structure to hold all the information about the DSI/panel */
 static struct mdss_dsi_data *mdss_dsi_res;
@@ -1579,12 +1586,16 @@ static int mdss_dsi_update_panel_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		pinfo->mipi.vsync_enable = 1;
 		pinfo->mipi.hw_vsync_mode = 1;
 		pinfo->partial_update_enabled = pinfo->partial_update_supported;
+		pinfo->ulps_feature_enabled = 1;
+		pinfo->ulps_suspend_enabled = 1;
 	} else {	/*video mode*/
 		pinfo->mipi.mode = DSI_VIDEO_MODE;
 		pinfo->type = MIPI_VIDEO_PANEL;
 		pinfo->mipi.vsync_enable = 0;
 		pinfo->mipi.hw_vsync_mode = 0;
 		pinfo->partial_update_enabled = 0;
+		pinfo->ulps_feature_enabled = 0;
+		pinfo->ulps_suspend_enabled = 1;
 	}
 
 	ctrl_pdata->panel_mode = pinfo->mipi.mode;
@@ -1600,6 +1611,9 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	int cur_power_state;
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED)
+	static int dic_vdds_set = 1;
+#endif
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -1716,6 +1730,14 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 
 end:
 #if defined(CONFIG_LGE_DISPLAY_COMMON)
+#if defined(CONFIG_LGE_DISPLAY_MFTS_DET_SUPPORTED)
+	if (lge_get_factory_boot()) {
+		if(dic_vdds_set) {
+			lge_set_validate_lcd_reg();
+			dic_vdds_set = 0;
+		}
+	}
+#endif
 	pr_err("[Display] %s-:\n", __func__);
 #else
 	pr_debug("%s-:\n", __func__);
@@ -3453,6 +3475,15 @@ static struct device_node *mdss_dsi_find_panel_of_node(
 				panel_name[i] = *(str1 + i);
 			panel_name[i] = 0;
 		}
+#if defined(CONFIG_LGE_DISPLAY_LUCYE_COMMON)
+		panel_not_connected = lge_get_lk_panel_status();
+		laf_mode_check = strcmp(lge_get_boot_partition(), "laf");
+		if ((panel_not_connected && !laf_mode_check  && !lge_get_mfts_mode())) {
+			pr_err("%s: laf mode detected panel init skip[%d]\n",
+				__func__, panel_not_connected);
+			goto exit;
+		}
+#endif
 		pr_info("%s: cmdline:%s panel_name:%s\n",
 			__func__, panel_cfg, panel_name);
 		if (!strcmp(panel_name, NONE_PANEL))
@@ -3848,6 +3879,17 @@ static int mdss_dsi_ctrl_probe(struct platform_device *pdev)
 			 */
 			ctrl_pdata->bklt_ctrl = UNKNOWN_CTRL;
 		}
+#ifdef CONFIG_LGE_DISPLAY_BL_EXTENDED
+		rc = mdss_panel_parse_blex_settings(dsi_pan_node, ctrl_pdata);
+		if (rc) {
+			pr_warn("%s: dsi bl settings parse failed\n", __func__);
+			/* Panels like AMOLED and dsi2hdmi chip
+			 * does not need backlight control.
+			 * So we should not fail probe here.
+			 */
+			ctrl_pdata->bkltex_ctrl = UNKNOWN_CTRL;
+		}
+#endif
 	} else {
 		ctrl_pdata->bklt_ctrl = UNKNOWN_CTRL;
 	}
@@ -4056,6 +4098,9 @@ static void mdss_dsi_res_deinit(struct platform_device *pdev)
 				__func__, __mdss_dsi_pm_name(i));
 		mdss_dsi_put_dt_vreg_data(&pdev->dev,
 			&sdata->power_data[i]);
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+		lge_mdss_dsi_deinit_extra_pm(pdev, ctrl_pdata);
+#endif
 	}
 
 	mdss_dsi_bus_scale_deinit(sdata);
@@ -4788,9 +4833,28 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	}
 
 #if defined (CONFIG_LGE_DISPLAY_COMMON)
+#if defined (CONFIG_ARCH_MSM8996)
+	/* Only HDK uses LGD RSP panel & needs DSV en gpio. */
+	if (pinfo->panel_type == LGD_R69007_INCELL_CMD_PANEL) {
+		ctrl_pdata->dsv_ena_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+				 "qcom,platform-dsv-ena-gpio", 0);
+		pr_err("[Display] DSV_ENA GPIO:%d\n", ctrl_pdata->dsv_ena_gpio);
+	}
+
+	if (gpio_request(ctrl_pdata->rst_gpio, "disp_rst-n"))
+		pr_err("request reset gpio failed\n");
+#endif
+#if defined(CONFIG_ARCH_MSM8996)
+	// MSM8996 uses LK
+	panel_not_connected = lge_get_lk_panel_status();
+	pr_debug("%s: lk panel init fail[%d]\n",
+			__func__, panel_not_connected);
+#else
+	// MSM8998 uses EDK2
 	panel_not_connected = lge_get_uefi_panel_status();
 	pr_err("%s: uefi panel_init %s\n", __func__,
 			((panel_not_connected == 1) ? "fail" : "success"));
+#endif
 
 	if (detect_factory_cable()){
 		pr_info("boot mode : factory cable detected\n");
@@ -4901,6 +4965,14 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 						__func__, rc);
 		return rc;
 	}
+#if IS_ENABLED(CONFIG_ARCH_MSM8996)
+#if IS_ENABLED(CONFIG_LGE_DISPLAY_COMMON)
+	rc = lge_mdss_dsi_init_extra_pm(ctrl_pdev, pan_node, ctrl_pdata);
+	if (rc) {
+		return rc;
+	}
+#endif
+#endif
 
 	rc = mdss_dsi_parse_ctrl_params(ctrl_pdev, pan_node, ctrl_pdata);
 	if (rc) {
@@ -4979,6 +5051,7 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 	 */
 	sdata = ctrl_pdata->shared_data;
 
+#ifndef CONFIG_ARCH_MSM8996
 	if (pinfo->ulps_suspend_enabled) {
 		rc = msm_dss_enable_vreg(
 			sdata->power_data[DSI_PHY_PM].vreg_config,
@@ -4989,6 +5062,7 @@ int dsi_panel_device_register(struct platform_device *ctrl_pdev,
 			return rc;
 		}
 	}
+#endif
 
 	pinfo->cont_splash_enabled =
 		ctrl_pdata->mdss_util->panel_intf_status(pinfo->pdest,

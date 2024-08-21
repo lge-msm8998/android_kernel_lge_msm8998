@@ -64,11 +64,23 @@ struct panel_id {
 enum lge_bl_map_type {
 	LGE_BLDFT = 0,		/* default */
 	LGE_BL = LGE_BLDFT,	/* main backlight */
+#if defined(CONFIG_LGE_HIGH_LUMINANCE_MODE)
+	LGE_BLHL,
+#endif
 #if defined(CONFIG_LGE_DISPLAY_VIDEO_ENHANCEMENT)
 	LGE_BLVE, 			/* main backlight with video enhancement */
 #endif /* CONFIG_LGE_DISPLAY_VIDEO_ENHANCEMENT */
 #if defined(CONFIG_LGE_DISPLAY_AMBIENT_SUPPORTED)
 	LGE_BLEX,		/* ambient backlight */
+#if defined(LGE_DISPLAY_BRIGHTNESS_DIMMING)
+	LGE_BLEXDIM,
+#endif
+#if defined(CONFIG_LGE_HIGH_LUMINANCE_MODE)
+	LGE_BLEXHL,
+#if defined(LGE_DISPLAY_BRIGHTNESS_DIMMING)
+	LGE_BLEXDIMHL,
+#endif
+#endif
 #endif /* CONFIG_LGE_DISPLAY_AMBIENT_SUPPORTED */
 	LGE_BLMAPMAX
 };

@@ -41,6 +41,9 @@
 enum mdss_mdp_clk_type {
 	MDSS_CLK_AHB,
 	MDSS_CLK_AXI,
+#if defined(CONFIG_LGE_DISPLAY_COMMON)
+	MDSS_CLK_MDP_SRC,
+#endif
 	MDSS_CLK_MDP_CORE,
 	MDSS_CLK_MDP_LUT,
 	MDSS_CLK_MDP_VSYNC,
