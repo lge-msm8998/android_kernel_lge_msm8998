@@ -24,7 +24,7 @@
 
 	soc {
 		i2c_2:i2c@c176000 {   // // [Modified] QUP_BASE address for BLSP# QUP# (ref. AP datasheet, This model use BLSP-1 QUP1)
-			status = "ok";
+			status = "disable";
             
 			/* [Modified] If use spi interface, Should be "qcom,spi-qup-v2".
 			          If use i2c interface, Should be "qcom,i2c-msm-v2". */            
